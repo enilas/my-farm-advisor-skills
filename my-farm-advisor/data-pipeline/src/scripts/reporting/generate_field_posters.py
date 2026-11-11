@@ -445,7 +445,7 @@ def _render_field_poster(
     fig = plt.figure(figsize=(28, 36))
     fig.patch.set_facecolor("#fafaf9")
     fig.suptitle(
-        f"Field Intelligence Report — {field_id[-8:]}  ·  {float(field_row.get('area_acres', 0)):.1f} ac  ·  Iowa Corn Belt",
+        f"Field Intelligence Report — {field_id[-8:]}  ·  {float(field_row.get('area_acres', 0)):.1f} ac  ·  {_DEFAULT_FARM_NAME}",
         fontsize=_POSTER_TITLE_SIZE,
         fontweight="bold",
         y=0.993,
