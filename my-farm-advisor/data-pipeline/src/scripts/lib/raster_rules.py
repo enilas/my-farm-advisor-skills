@@ -97,7 +97,9 @@ def coverage(tif_path: str | Path, geom_wgs84, *, nodata_extra: float | None = N
         in_field = geometry_mask([geom.__geo_interface__], out_shape=ds.shape,
                                  transform=ds.transform, invert=True)
         arr = ds.read(1, masked=True)
-        filled = np.asarray(np.ma.filled(arr, np.nan), dtype="float64")
+        # Integer rasters (NASADEM/ALOS/SoilGrids) cannot be filled with NaN
+        # directly; widen to float64 before applying the masked fill.
+        filled = np.asarray(np.ma.filled(arr.astype("float64"), np.nan), dtype="float64")
         valid = np.isfinite(filled)
         if nodata_extra is not None:
             valid &= filled != nodata_extra
@@ -108,8 +110,8 @@ def coverage(tif_path: str | Path, geom_wgs84, *, nodata_extra: float | None = N
         field_valid = int((in_field & valid).sum())
         # margin actually present: field bounds vs raster bounds, in metres
         gb = gpd.GeoSeries([geom]).bounds.iloc[0]
-        m_lat = (ds.bounds.top - gb[3]) if ds.bounds.top > gb[3] else 0.0
-        m_lon = (gb[2] - ds.bounds.left) if ds.bounds.left < gb[2] else 0.0
+        m_lat = (ds.bounds.top - gb["maxy"]) if ds.bounds.top > gb["maxy"] else 0.0
+        m_lon = (ds.bounds.right - gb["maxx"]) if ds.bounds.right > gb["maxx"] else 0.0
         if ds.crs.is_geographic:
             m = max(m_lat, m_lon) * 111320.0
         else:
