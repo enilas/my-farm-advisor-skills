@@ -70,6 +70,16 @@ def grower_logs_dir(grower_slug: str) -> Path:
     return grower_dir(grower_slug) / "logs"
 
 
+def grower_maps_dir(grower_slug: str) -> Path:
+    """Grower-level interactive map output directory (all farms in one map)."""
+    return grower_dir(grower_slug) / "maps"
+
+
+def grower_map_path(grower_slug: str, filename: str | None = None) -> Path:
+    normalized = validate_path_slug(grower_slug, "grower_slug").replace("-", "_")
+    return grower_maps_dir(grower_slug) / (filename or f"{normalized}_fields_map.html")
+
+
 def farm_dir(grower_slug: str, farm_slug: str) -> Path:
     return ensure_data_root_path(
         grower_dir(grower_slug) / "farms" / validate_path_slug(farm_slug, "farm_slug")
