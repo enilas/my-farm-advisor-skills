@@ -229,13 +229,14 @@ def _soil_attributes_by_mukey(detail_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _ndvi_panel(ax, image_path: Path | None, title: str) -> None:
-    ax.set_title(
-        title, fontsize=_PANEL_TITLE_SIZE, fontweight="bold", loc="left", pad=8
-    )
     if image_path is not None and image_path.exists():
+        # Cached cards carry their own heading; do not add a second one.
         ax.imshow(mpimg.imread(image_path))
         ax.axis("off")
         return
+    ax.set_title(
+        title, fontsize=_PANEL_TITLE_SIZE, fontweight="bold", loc="left", pad=8
+    )
     ax.axis("off")
     ax.text(
         0.5,
@@ -397,9 +398,12 @@ def _ranking_card(ax, field_reporting_df, field_id):
 
 
 def _soil_map_panel(ax, image_path: Path | None, title: str, fallback_render) -> None:
-    ax.set_title(
-        title, fontsize=_PANEL_TITLE_SIZE, fontweight="bold", loc="left", pad=8
-    )
+    """Composite a cached soil map, or render it inline.
+
+    Both paths title the panel themselves: the cached PNG has its heading baked
+    in, and the inline workflow calls ``ax.set_title``. A title here as well
+    overprints two headings on the same axes (QC 2026-11-11).
+    """
     if image_path is not None and image_path.exists():
         ax.imshow(mpimg.imread(image_path))
         ax.axis("off")
