@@ -18,6 +18,7 @@ def _load_bootstrap_helpers():
         ensure_canonical_data_tree,
         ensure_skill_path,
         field_slug_map_from_inventory,
+        sync_farm_metadata,
     )
 
     ensure_skill_path("field-boundaries")
@@ -29,6 +30,7 @@ def _load_bootstrap_helpers():
         field_boundary_path,
         ensure_canonical_data_tree,
         field_slug_map_from_inventory,
+        sync_farm_metadata,
         download_fields,
     )
 
@@ -40,6 +42,7 @@ def main():
         field_boundary_path,
         ensure_canonical_data_tree,
         field_slug_map_from_inventory,
+        sync_farm_metadata,
         download_fields,
     ) = _load_bootstrap_helpers()
 
@@ -98,6 +101,10 @@ def main():
             target = field_boundary_path(grower_slug, farm_slug, field_slug)
             target.parent.mkdir(parents=True, exist_ok=True)
             single.to_file(target, driver="GeoJSON")
+
+    # Boundaries are authoritative for state/counties; refresh farm.json now
+    # that the canonical boundary file exists.
+    sync_farm_metadata(grower_slug, farm_slug)
 
     print(f"\n✓ Downloaded {len(fields)} fields")
     print(f"  Total area: {fields['area_acres'].sum():.1f} acres")

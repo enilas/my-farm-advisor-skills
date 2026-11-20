@@ -13,10 +13,10 @@ fields across all of their farms.
 
 ## Runtime code
 
-- [`../../src/scripts/reporting/generate_grower_web_map.py`](../../src/scripts/reporting/generate_grower_web_map.py) -
+- [`../src/scripts/reporting/generate_grower_web_map.py`](../src/scripts/reporting/generate_grower_web_map.py) -
   the generator: reads pipeline boundaries and rotation tables, builds the
   payload, and writes the single-file HTML map.
-- [`../../src/scripts/lib/paths.py`](../../src/scripts/lib/paths.py) -
+- [`../src/scripts/lib/paths.py`](../src/scripts/lib/paths.py) -
   `grower_maps_dir()` and `grower_map_path()` define the canonical output
   location (`growers/<grower>/maps/`).
 
