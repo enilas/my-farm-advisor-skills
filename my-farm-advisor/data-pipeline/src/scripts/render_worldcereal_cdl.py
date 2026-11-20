@@ -25,7 +25,6 @@ sys.path.insert(0, _HERE)
 sys.path.insert(0, os.path.join(_HERE, "lib"))
 sys.path.insert(0, os.path.join(_HERE, "ingest"))
 
-import fiona
 import geopandas as gpd
 import matplotlib
 import numpy as np
@@ -81,7 +80,8 @@ def clip_cdl(field_geom_4326, out_dir):
                     transform=src.window_transform(win), crs="EPSG:5070",
                     nodata=0, compress="deflate", tiled=True,
                     blockxsize=256, blockysize=256)
-    with rasterio.open(clip_path, "w", **prof) as dst:
+    from raster_rules import cog_profile as _cog  # pyright: ignore[reportMissingImports]
+    with rasterio.open(clip_path, "w", **_cog(prof, resampling="nearest")) as dst:
         dst.write(arr, 1)
     return state_raster, clip_path
 
@@ -146,9 +146,8 @@ def main():
     farm, field, season, scene_month = "demo-us", "ia-r1", "tc-s2", "2023-07"
     fdir = os.path.join(rw.ROOT, farm)
     field_dir = os.path.join(fdir, "fields", field)
-    with fiona.open(os.path.join(field_dir, "boundary",
-                                 "field_boundary.geojson")) as src:
-        geom = shape(next(iter(src))["geometry"])
+    geom = gpd.read_file(os.path.join(field_dir, "boundary",
+                                      "field_boundary.geojson")).geometry.iloc[0]
 
     run = rw.find_run(farm, field, season)
     epsg = FIG["epsg"] = run["epsg"]
