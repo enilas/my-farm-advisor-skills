@@ -67,11 +67,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--field-prefix", required=True)
     ap.add_argument("--country", default="US")
     ap.add_argument("--state", default="")
+    ap.add_argument(
+        "--state-fips",
+        default="",
+        help="Two-digit state FIPS; required for US fields so downstream "
+        "state-scoped datasets (CDL) select the right raster",
+    )
     ap.add_argument("--year", default="")
     args = ap.parse_args(argv)
 
     grower = os.environ.get("AG_GROWER_SLUG") or sys.exit("AG_GROWER_SLUG required")
     farm = os.environ.get("AG_FARM_SLUG") or sys.exit("AG_FARM_SLUG required")
+    state_fips = (args.state_fips or "").strip().zfill(2) if args.state_fips.strip() else ""
+    if args.country.upper() == "US" and not state_fips:
+        sys.exit(
+            "--state-fips is required for US fields: downstream state-scoped "
+            "datasets (CDL) otherwise fall back to the wrong state"
+        )
     farm_dir = DATA_ROOT / "growers" / grower / "farms" / farm
     if not farm_dir.exists():
         sys.exit(f"farm dir missing: {farm_dir} (create farm.json first)")
@@ -135,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
                     "field_id": slug,
                     "country": args.country,
                     "state": args.state,
+                    "state_fips": state_fips,
                     "year": args.year,
                     "area_ha_est": round(ha, 1),
                     "crop": crop,
@@ -176,6 +189,8 @@ def main(argv: list[str] | None = None) -> int:
         "row_groups_read": len(sel),
         "total_row_groups": pf.metadata.num_row_groups,
         "min_area_ha": args.min_area_ha,
+        "state": args.state,
+        "state_fips": state_fips,
         "accessed_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         "fields": [r["field_id"] for r in inv_rows],
     }

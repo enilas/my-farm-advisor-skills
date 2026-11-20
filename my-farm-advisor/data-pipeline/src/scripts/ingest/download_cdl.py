@@ -7,10 +7,12 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
+import rasterio
 import requests
 from requests import HTTPError
 
@@ -27,6 +29,7 @@ from paths import (
     shared_cdl_conus_raster_path,
     shared_cdl_dir,
     shared_cdl_state_raster_path,
+    shared_geoadmin_states_dir,
 )
 from reporting_bootstrap import ensure_skill_path
 
@@ -49,6 +52,33 @@ def _cdl_raster_path(year: int, *, conus: bool, state_fips: str | None = None) -
     return shared_cdl_state_raster_path(year, str(state_fips or "19"))
 
 
+def _expected_download_bytes(resp: requests.Response) -> int | None:
+    """Total raster size advertised by the server, or None when unknown."""
+    content_range = resp.headers.get("Content-Range", "")
+    if "/" in content_range:
+        total = content_range.rsplit("/", 1)[-1].strip()
+        if total.isdigit():
+            return int(total)
+    length = resp.headers.get("Content-Length")
+    if length and length.isdigit():
+        return int(length)
+    return None
+
+
+def _cdl_raster_is_readable(path: Path) -> bool:
+    """True when the TIFF header and its last row can be decoded.
+
+    A truncated stream still leaves a valid header, so read the final row:
+    that is where an interrupted download loses its strips.
+    """
+    try:
+        with rasterio.open(path) as ds:
+            ds.read(1, window=((ds.height - 1, ds.height), (0, 1)))
+        return True
+    except Exception:
+        return False
+
+
 def _download_cdl_raster(
     year: int,
     *,
@@ -60,19 +90,49 @@ def _download_cdl_raster(
     label = _cdl_coverage_label(conus=conus, state_fips=state_fips)
     cdl_path = _cdl_raster_path(year, conus=conus, state_fips=state_fips)
     if cdl_path.exists() and not force:
-        print(f"  Cached CDL {year} {label}: {cdl_path}")
-        return cdl_path
+        if _cdl_raster_is_readable(cdl_path):
+            print(f"  Cached CDL {year} {label}: {cdl_path}")
+            return cdl_path
+        # An interrupted stream leaves a readable header but missing strips;
+        # never treat that as a cache hit.
+        print(f"  Cached CDL {year} {label} is truncated; redownloading")
+        cdl_path.unlink(missing_ok=True)
 
     cdl_path.parent.mkdir(parents=True, exist_ok=True)
     url = f"https://nassgeodata.gmu.edu/nass_data_cache/byfips/CDL_{year}_{label}.tif"
     print(f"  Downloading CDL {year} {label}...")
-    with requests.get(url, stream=True, timeout=180) as resp:
-        resp.raise_for_status()
-        with open(cdl_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=1024 * 1024):
-                if chunk:
-                    f.write(chunk)
-    print(f"  Downloaded CDL {year} {label}: {cdl_path}")
+    attempts = 3
+    for attempt in range(1, attempts + 1):
+        partial = cdl_path.with_name(f"{cdl_path.name}.{os.getpid()}.part")
+        try:
+            with requests.get(url, stream=True, timeout=180) as resp:
+                resp.raise_for_status()
+                expected = _expected_download_bytes(resp)
+                written = 0
+                with open(partial, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+                            written += len(chunk)
+            if expected is not None and written != expected:
+                raise IOError(
+                    f"incomplete download: wrote {written} of {expected} bytes"
+                )
+            partial.replace(cdl_path)
+            if not _cdl_raster_is_readable(cdl_path):
+                raise IOError("downloaded raster failed the last-strip decode check")
+            print(f"  Downloaded CDL {year} {label}: {cdl_path}")
+            return cdl_path
+        except Exception as exc:  # noqa: BLE001 - retry any transport/decode failure
+            partial.unlink(missing_ok=True)
+            cdl_path.unlink(missing_ok=True)
+            print(
+                f"  CDL {year} {label} attempt {attempt}/{attempts} failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            if attempt == attempts:
+                raise
+            time.sleep(2.0 * attempt)
     return cdl_path
 
 
@@ -189,13 +249,59 @@ def parse_args() -> argparse.Namespace:
 
 
 def _state_fips_values(fields: gpd.GeoDataFrame) -> list[str]:
-    if "state_fips" not in fields.columns:
-        return ["19"]
-    values = (
-        pd.Series(fields["state_fips"], dtype="object").fillna("").astype(str).str.strip().tolist()
+    if "state_fips" in fields.columns:
+        values = (
+            pd.Series(fields["state_fips"], dtype="object")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .tolist()
+        )
+        unique_values = sorted({value.zfill(2) for value in values if value})
+        if unique_values:
+            return unique_values
+
+    # Boundary sources that only carry a state code/name (e.g. USDA CSB seed)
+    # must still select the right state raster: the historic fallback to Iowa
+    # silently produced empty crop stats for non-Iowa farms.
+    if "state" in fields.columns:
+        lookup = _state_lookup()
+        raw = (
+            pd.Series(fields["state"], dtype="object")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+        resolved = {lookup[value] for value in raw if value in lookup}
+        if resolved:
+            return sorted(resolved)
+        unknown = sorted({value for value in raw if value and value not in lookup})
+        if unknown:
+            raise ValueError(
+                "Cannot resolve state FIPS for state value(s) "
+                f"{', '.join(unknown)}; add a 'state_fips' column to the farm "
+                "boundaries or use a recognized state code/name"
+            )
+    raise ValueError(
+        "Farm boundaries carry neither 'state_fips' nor a recognizable 'state' "
+        "column; state-scoped datasets cannot select a raster"
     )
-    unique_values = sorted({value.zfill(2) for value in values if value})
-    return unique_values or ["19"]
+
+
+def _state_lookup() -> dict[str, str]:
+    """Map upper-case state code and name to two-digit FIPS (geoadmin L1)."""
+    path = shared_geoadmin_states_dir() / "states_usa.geojson"
+    if not path.exists():
+        return {}
+    states = gpd.read_file(path)
+    states = states[["state_fips", "state_code", "state_name"]]
+    lookup: dict[str, str] = {}
+    for row in states.itertuples(index=False):
+        fips = str(row.state_fips).zfill(2)
+        lookup[str(row.state_code).upper()] = fips
+        lookup[str(row.state_name).upper()] = fips
+    return lookup
 
 
 def _table_field_ids(csv_path: Path) -> set[str]:
