@@ -100,7 +100,8 @@ It defaults to `--stage all`, refreshes the runtime source first (skip with
 `--no-refresh`), writes the canonical output dir, and ends with the figure
 count per category plus the manifest head and validator status. `--stage`,
 `--out-dir`, `--root`, and `--skip-validate` behave as above. The explicit
-`python run.py` form above is what the wrapper calls.
+`python run.py` form above is what the wrapper calls. Every run also renders
+`report.html` unless `--no-report` is passed.
 
 When the checkout changed, refresh the runtime source before a manual run (the
 wrapper does this by default):
@@ -120,6 +121,7 @@ derived/eda/field-portfolio/
                            w1_*.png w2_*.png w3_*.png
   tables/table_fields.csv  one row per field, stable column order
   analysis.json            the contract the report consumes
+  report.html              the rendered single-page report
   manifest.json            inputs/outputs with sha256, validator status, git head
 ```
 
@@ -144,6 +146,25 @@ derived/eda/field-portfolio/
 
 A report renders this; it must not recompute or re-derive the numbers. If a
 figure's message changes, change the record here, not in the report.
+
+## Report
+
+`report.html` is a single static page rendered from `analysis.json` by
+`report.py` (stdlib only). One card per figure carries the image, title,
+question, finding, stat chips, and caveat; a conventions block and a footer
+with the validator status and per-figure sha256 follow. It is a *renderer*:
+every number is copied from the contract, and it never embeds `generated_at`,
+the git head, mtimes, or absolute paths, so two runs over the same data produce
+byte-identical HTML.
+
+Open the page in a browser; use **Print → Save as PDF** for a paginated A4 copy
+(the page carries print CSS). A run writes it by default; `--no-report` skips
+it while still writing the figures and `analysis.json`.
+
+A committed copy lives at
+`examples/assignment-2-report/output/report.html` with its figures. Regenerate
+it with `examples/assignment-2-report/build.sh <runtime-root>`; the fixture
+holds only the page and PNGs, not the timestamped contract or tables.
 
 ## Boundary Figures and What They Tell
 
@@ -308,4 +329,5 @@ uv run --with pytest --with geopandas --with pandas --with scipy \
 
 Offline fixtures cover GDD capping, frost windows, season precipitation,
 effect sizes, cell snapping, the known-square geometry check, loader failures,
-and the full runner contract.
+and the full runner contract. Report tests cover byte-identical re-renders,
+figure references, escaping, and the `--no-report` opt-out.

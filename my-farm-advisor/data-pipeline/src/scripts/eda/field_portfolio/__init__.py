@@ -7,6 +7,7 @@ module is reviewable on its own:
     metrics    agronomic derivations (GDD, frost dates) that Stage 3 consumes
     stats      effect sizes, bootstrap intervals, rank tests
     figures_*  one module per data category
+    report     analysis.json -> a static, printable HTML page
     run        CLI entrypoint, writes figures/tables/analysis.json/manifest.json
 
 Runnable code lives next to the other EDA scripts; the workflow prose lives in
@@ -25,4 +26,4 @@ for _candidate in (_SCRIPTS, _SCRIPTS / "eda"):
     if str(_candidate) not in sys.path:
         sys.path.insert(0, str(_candidate))
 
-__all__ = ["dataset", "metrics", "stats"]
+__all__ = ["dataset", "metrics", "report", "stats"]

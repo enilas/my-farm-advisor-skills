@@ -9,8 +9,10 @@ Run: python -m pytest src/scripts/tests/test_eda_field_portfolio.py -q
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 import numpy as np
@@ -496,3 +498,119 @@ def test_weather_stage_writes_three_records(runtime):
         assert record["n"] == 4
         assert (out_dir / record["file"]).exists()
         assert record["caveat"]
+
+
+# --------------------------------------------------------------------------
+# report renderer
+# --------------------------------------------------------------------------
+
+
+class _PageScan(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.images: list[str] = []
+        self.text: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "img":
+            src = dict(attrs).get("src")
+            if src:
+                self.images.append(src)
+
+    def handle_data(self, data):
+        self.text.append(data)
+
+
+def test_report_is_deterministic_and_references_every_figure(runtime):
+    from field_portfolio import report, run
+
+    out_dir = runtime / "report-out"
+    assert run.main(
+        ["--root", str(runtime), "--out-dir", str(out_dir), "--skip-validate"]
+    ) == 0
+
+    report_path = out_dir / "report.html"
+    assert report_path.is_file()
+    first = report_path.read_bytes()
+
+    # Re-rendering the same contract must be byte-identical: no timestamps,
+    # no git head, no absolute paths may leak into the page.
+    report.render_report(out_dir)
+    assert report_path.read_bytes() == first
+
+    text = first.decode("utf-8")
+    assert "generated_at" not in text
+    assert "git_head" not in text
+    assert str(runtime) not in text
+    assert "/home/" not in text
+
+    analysis = json.loads((out_dir / "analysis.json").read_text(encoding="utf-8"))
+    scan = _PageScan()
+    scan.feed(text)
+    assert len(scan.images) == len(analysis["figures"])
+    for src in scan.images:
+        assert (out_dir / src).is_file(), f"missing figure for <img src={src}>"
+    for record in analysis["figures"]:
+        assert record["id"] in text
+        assert record["finding"] in text or record["finding"][:40] in " ".join(scan.text)
+
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert any(
+        Path(entry["path_rel"]).name == "report.html"
+        for entry in manifest["outputs"]
+    ), "report.html must be declared in the manifest"
+
+
+def test_report_escapes_untrusted_text(tmp_path):
+    from field_portfolio import report
+
+    analysis = {
+        "stage": "all",
+        "dataset": {"fields": 2, "growers": ["<x>"], "weather_cells": 1,
+                    "cdl_years": {"f": [2019, 2020]}},
+        "unit_of_analysis": {"boundaries": "<field>"},
+        "figures": [
+            {
+                "id": "x1",
+                "file": "figures/x1.png",
+                "category": "boundaries",
+                "title": '<script>alert("t")</script>',
+                "question": "q & a",
+                "finding": "<b>unsafe</b>",
+                "n": 2,
+                "unit": "field",
+                "stat": {"test": "descriptive"},
+                "caveat": "no <img src=x>",
+            }
+        ],
+    }
+    path = report.render_report(tmp_path, analysis=analysis, validation={})
+    text = path.read_text(encoding="utf-8")
+    assert "<script>alert" not in text
+    assert "&lt;script&gt;" in text
+    assert "&lt;b&gt;unsafe&lt;/b&gt;" in text
+    assert "no &lt;img src=x&gt;" in text
+
+
+def test_no_report_flag_omits_the_page(runtime):
+    from field_portfolio import run
+
+    out_dir = runtime / "no-report-out"
+    assert run.main(
+        [
+            "--root",
+            str(runtime),
+            "--out-dir",
+            str(out_dir),
+            "--skip-validate",
+            "--no-report",
+        ]
+    ) == 0
+
+    assert (out_dir / "analysis.json").is_file()
+    assert not (out_dir / "report.html").exists()
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert all(
+        Path(entry["path_rel"]).name != "report.html"
+        for entry in manifest["outputs"]
+    )

@@ -12,6 +12,7 @@ OUT_DIR=""
 ROOT="${DATA_PIPELINE_DATA_ROOT:-}"
 REFRESH=1
 SKIP_VALIDATE=0
+NO_REPORT=0
 
 usage() {
   cat <<'EOF'
@@ -32,6 +33,7 @@ Options:
                       Only safe when the runtime already matches the checkout.
   --skip-validate     Pass through to run.py; recorded in the manifest. Use
                       only for deliberate forensics.
+  --no-report         Skip report.html (figures and analysis.json still land).
   -h, --help          Show this help.
 
 Environment:
@@ -71,6 +73,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-validate)
       SKIP_VALIDATE=1
+      shift
+      ;;
+    --no-report)
+      NO_REPORT=1
       shift
       ;;
     -h|--help)
@@ -131,6 +137,7 @@ fi
 
 ARGS=(--stage "${STAGE}" --out-dir "${OUT_DIR}")
 (( SKIP_VALIDATE )) && ARGS+=(--skip-validate)
+(( NO_REPORT )) && ARGS+=(--no-report)
 
 (
   cd "${RUNTIME_BASE}/src"
@@ -164,6 +171,8 @@ print(f"[eda] figures   {len(figures)} records, {len(pngs)} png on disk")
 print("               " + ", ".join(f"{name} {count}" for name, count in categories.items()))
 print(f"[eda] files     tables/table_fields.csv {size('tables/table_fields.csv')} | "
       f"analysis.json {size('analysis.json')} | manifest.json {size('manifest.json')}")
+if (out / "report.html").is_file():
+    print(f"[eda] report    report.html {size('report.html')} — open it in a browser; print to PDF")
 print(f"[eda] manifest  head {manifest['git_head'][:7]} "
       f"dirty={str(manifest['git_dirty']).lower()} "
       f"validator={manifest['validation']['status']}")

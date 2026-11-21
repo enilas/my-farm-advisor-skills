@@ -11,7 +11,8 @@ Examples
 Outputs land in ``<runtime>/derived/eda/field-portfolio`` unless ``--out-dir``
 says otherwise. Stages are additive: ``boundaries`` writes the size/shape and
 map set, ``cdl`` the crop-history set, ``weather`` the cell-year climate set,
-and ``all`` writes every stage.
+and ``all`` writes every stage. Every run also renders ``report.html`` from the
+analysis contract unless ``--no-report`` is passed.
 """
 
 from __future__ import annotations
@@ -50,6 +51,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--skip-validate",
         action="store_true",
         help="skip the dataset gate (recorded in the manifest; not recommended)",
+    )
+    parser.add_argument(
+        "--no-report",
+        action="store_true",
+        help="skip report.html (the figures and analysis.json are still written)",
     )
     return parser.parse_args(argv)
 
@@ -228,6 +234,15 @@ def main(argv: list[str] | None = None) -> int:
     outputs = [table_path, analysis_path]
     outputs.extend(out_dir / record["file"] for record in records)
 
+    report_path: Path | None = None
+    if not args.no_report:
+        from field_portfolio import report
+
+        report_path = report.render_report(
+            out_dir, analysis=analysis, validation=validation
+        )
+        outputs.append(report_path)
+
     git_head, git_dirty = _git_state(base)
     manifest = {
         "workflow": "eda-field-portfolio",
@@ -268,6 +283,8 @@ def main(argv: list[str] | None = None) -> int:
             f"{record['finding'][:72]}"
         )
     print(f"\n  wrote {len(outputs)} files + manifest.json")
+    if report_path is not None:
+        print(f"  report    {report_path}")
     return 0
 
 

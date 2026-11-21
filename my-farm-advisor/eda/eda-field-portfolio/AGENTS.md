@@ -34,8 +34,12 @@ paths, the installer, or output locations.
 - `lib/field_frame.py` and `lib/palettes.py` are consumed read-only. If one
   needs changing, change the library and re-review every figure it draws.
 - Outputs go to `<runtime>/derived/eda/field-portfolio/` with stable relative
-  paths. Never write into the skill checkout.
-- The report is out of scope. This workflow stops at `analysis.json`.
+  paths. Never write into the skill checkout. The one exception is the committed
+  fixture under `examples/**/output/`, which holds only `report.html` and its
+  PNGs.
+- `report.html` is a *renderer* of `analysis.json`, not a second analyst. It
+  must not recompute a number, and it must not embed `generated_at`, git head,
+  mtimes, or absolute paths. Change the figure record, not the report.
 
 ## Local validation
 

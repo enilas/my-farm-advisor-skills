@@ -287,10 +287,12 @@ The umbrella entrypoint is [`SKILL.md`](SKILL.md). From there, the skill routes 
 runnable EDA skill (not a recipe to copy). It compares a set of growers across
 three fixed categories — field boundaries, crop history from CDL, and weather —
 and writes 11 static PNGs (B1–B3, C1–C3, W1–W3, plus the M0/M1 maps),
-`tables/table_fields.csv`, and the report contract `analysis.json` under
-`<runtime>/derived/eda/field-portfolio/`. `manifest.json` hashes every input
-and output; the skill stops at `analysis.json`, and report rendering is
-downstream.
+`tables/table_fields.csv`, the report contract `analysis.json`, and a rendered
+single-page `report.html` under `<runtime>/derived/eda/field-portfolio/`.
+`manifest.json` hashes every input and output. The HTML report is a renderer of
+`analysis.json` — it copies the numbers and recomputes nothing — and prints to
+PDF from a browser. A committed copy lives at
+[`eda/eda-field-portfolio/examples/assignment-2-report/output/report.html`](eda/eda-field-portfolio/examples/assignment-2-report/output/report.html).
 
 ## Typical Workflow
 
