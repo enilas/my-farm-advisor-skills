@@ -204,6 +204,89 @@ def boundary_metrics(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 # --------------------------------------------------------------------------
+# crop history (CDL)
+# --------------------------------------------------------------------------
+
+CDL_COLUMNS = ("field_id", "year", "crop_code", "crop_name", "pixel_count", "pct")
+
+
+def load_cdl(farm: FarmRef) -> pd.DataFrame:
+    """Read every per-year CDL table for a farm into one long frame.
+
+    The upstream tables are one row per crop class per field-year; only the
+    dominant class is used downstream, but every class stays here so the
+    composition can be audited without re-reading the runtime.
+    """
+    frames: list[pd.DataFrame] = []
+    for year in cdl_years(farm):
+        matches = sorted(farm.tables_dir.glob(f"*_{year}_cdl.csv"))
+        if not matches:
+            continue
+        path = matches[0]
+        frame = pd.read_csv(path)
+        missing = set(CDL_COLUMNS) - set(frame.columns)
+        if missing:
+            raise PortfolioError(
+                f"{farm.label}: {path.name} is missing columns {sorted(missing)}"
+            )
+        years = frame["year"].dropna().unique()
+        if len(years) != 1 or int(years[0]) != year:
+            raise PortfolioError(
+                f"{farm.label}: {path.name} carries years {sorted(years)}; "
+                f"expected only {year}"
+            )
+        frames.append(frame)
+    if not frames:
+        return pd.DataFrame(columns=list(CDL_COLUMNS))
+    return pd.concat(frames, ignore_index=True)
+
+
+def crop_sequence(
+    cdl: pd.DataFrame, field_ids: list[str], years: list[int]
+) -> pd.DataFrame:
+    """One row per field-year: the crop with the largest pixel share.
+
+    Refuses an incomplete grid rather than silently plotting a hole. The
+    upstream tables consistently put the planted crop above 50%, so the
+    dominant class is the field's crop, not a stray edge pixel.
+    """
+    if cdl.empty:
+        return pd.DataFrame(
+            columns=["field_id", "year", "crop_name", "dominant_pct", "crop_group"]
+        )
+    keys = ["field_id", "year"]
+    duplicated = cdl.duplicated([*keys, "crop_name"])
+    if duplicated.any():
+        raise PortfolioError(
+            f"CDL has {int(duplicated.sum())} duplicate field-year-crop rows; "
+            "a farm table was read twice or concatenated without ignore_index"
+        )
+    dominant = cdl.loc[cdl.groupby(keys)["pct"].idxmax()].copy()
+    dominant = dominant.rename(columns={"pct": "dominant_pct"})
+    expected = pd.MultiIndex.from_product(
+        [sorted(set(field_ids)), sorted(set(years))], names=keys
+    )
+    observed = pd.MultiIndex.from_frame(dominant[keys])
+    missing = expected.difference(observed)
+    if len(missing):
+        sample = ", ".join(f"{field}@{year}" for field, year in list(missing)[:5])
+        raise PortfolioError(
+            f"CDL is missing {len(missing)} field-year(s), e.g. {sample}; "
+            "the rotation view needs a complete 5-year grid"
+        )
+    dominant["crop_group"] = np.where(
+        dominant["crop_name"].isin(["Corn", "Soybeans"]),
+        dominant["crop_name"],
+        "Other",
+    )
+    return (
+        dominant[["field_id", "year", "crop_name", "dominant_pct", "crop_group"]]
+        .sort_values(keys, kind="stable")
+        .reset_index(drop=True)
+    )
+
+
+# --------------------------------------------------------------------------
 # context layers (optional, never data)
 # --------------------------------------------------------------------------
 
@@ -286,6 +369,8 @@ class Portfolio:
     fields: gpd.GeoDataFrame
     fields_table: pd.DataFrame
     weather: pd.DataFrame
+    cdl: pd.DataFrame
+    sequence: pd.DataFrame
     cdl_years: dict[str, list[int]]
 
     @property
@@ -341,6 +426,8 @@ def build_portfolio(
 
     geometry_parts: list[gpd.GeoDataFrame] = []
     weather_parts: list[pd.DataFrame] = []
+    cdl_parts: list[pd.DataFrame] = []
+    sequence_parts: list[pd.DataFrame] = []
     years_by_farm: dict[str, list[int]] = {}
 
     for farm in farms:
@@ -387,6 +474,19 @@ def build_portfolio(
 
         geometry_parts.append(metrics)
 
+        if "cdl" in require_layers:
+            farm_cdl = load_cdl(farm)
+            if not farm_cdl.empty:
+                farm_cdl = farm_cdl.assign(
+                    grower_slug=farm.grower_slug, farm_slug=farm.farm_slug
+                )
+                cdl_parts.append(farm_cdl)
+                sequence_parts.append(
+                    crop_sequence(
+                        farm_cdl, metrics["field_id"].tolist(), years
+                    ).assign(grower_slug=farm.grower_slug, farm_slug=farm.farm_slug)
+                )
+
     fields = pd.concat(geometry_parts, ignore_index=True)
     fields = gpd.GeoDataFrame(fields, geometry="geometry", crs=geometry_parts[0].crs)
 
@@ -408,6 +508,30 @@ def build_portfolio(
     weather_frame = (
         pd.concat(weather_parts, ignore_index=True) if weather_parts else pd.DataFrame()
     )
+    cdl_frame = (
+        pd.concat(cdl_parts, ignore_index=True)
+        if cdl_parts
+        else pd.DataFrame(columns=list(CDL_COLUMNS) + ["grower_slug", "farm_slug"])
+    )
+    sequence_frame = (
+        pd.concat(sequence_parts, ignore_index=True)
+        if sequence_parts
+        else pd.DataFrame(
+            columns=[
+                "field_id",
+                "year",
+                "crop_name",
+                "dominant_pct",
+                "crop_group",
+                "grower_slug",
+                "farm_slug",
+            ]
+        )
+    )
+    if not sequence_frame.empty:
+        sequence_frame = sequence_frame.sort_values(
+            ["grower_slug", "farm_slug", "field_id", "year"], kind="stable"
+        ).reset_index(drop=True)
 
     return Portfolio(
         base=base,
@@ -415,6 +539,8 @@ def build_portfolio(
         fields=fields,
         fields_table=table,
         weather=weather_frame,
+        cdl=cdl_frame,
+        sequence=sequence_frame,
         cdl_years=years_by_farm,
     )
 

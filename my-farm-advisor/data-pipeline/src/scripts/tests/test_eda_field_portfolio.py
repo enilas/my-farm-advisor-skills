@@ -105,12 +105,18 @@ def _write_farm(root: Path, grower: str, farm: str, state: str, specs, *, skip_c
 
     if not skip_cdl:
         for year in range(2019, 2024):
+            rows = []
+            for index, (field_id, *_rest) in enumerate(specs):
+                # One continuous-corn field plus one alternating field keeps
+                # every CDL branch (sequence, transition, monocrop) exercised.
+                if index == 0:
+                    crop = "Corn"
+                else:
+                    crop = "Corn" if (year - 2019 + index) % 2 == 0 else "Soybeans"
+                rows.append(f"{field_id},{year},1,{crop},100,100.0,test")
             (farm_dir / "derived" / "tables" / f"{farm}_{year}_cdl.csv").write_text(
                 "field_id,year,crop_code,crop_name,pixel_count,pct,crop_source\n"
-                + "".join(
-                    f"{field_id},{year},1,Corn,100,100.0,test\n"
-                    for field_id, *_ in specs
-                ),
+                + "".join(f"{row}\n" for row in rows),
                 encoding="utf-8",
             )
     return farm_dir
@@ -187,6 +193,21 @@ def test_season_precip_respects_the_month_window():
 # --------------------------------------------------------------------------
 # stats
 # --------------------------------------------------------------------------
+
+
+def test_chi_square_matches_hand_calculation():
+    result = stats.chi_square([[8, 4], [4, 0]])
+    assert result.n == 16
+    assert result.dof == 1
+    assert result.chi2 == pytest.approx(16 / 9, rel=1e-6)
+    assert result.cramers_v == pytest.approx(1 / 3, rel=1e-6)
+    assert 0 < result.p < 1
+    assert result.min_expected == pytest.approx(1.0)
+
+
+def test_chi_square_rejects_a_1d_table():
+    with pytest.raises(ValueError, match="2-D table"):
+        stats.chi_square([1, 2, 3])
 
 
 def test_cliffs_delta_is_signed_and_bounded():
@@ -308,6 +329,41 @@ def test_duplicate_field_id_across_growers_is_rejected(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------
+# crop history
+# --------------------------------------------------------------------------
+
+
+def test_crop_sequence_uses_the_dominant_class(runtime):
+    portfolio = dataset.build_portfolio(root=runtime)
+    assert len(portfolio.cdl) == 20  # one class per field-year in the fixture
+    assert len(portfolio.sequence) == 20
+    assert portfolio.sequence.groupby("field_id")["year"].nunique().eq(5).all()
+    assert portfolio.sequence["dominant_pct"].between(50, 100).all()
+    wide = portfolio.sequence.pivot(
+        index="field_id", columns="year", values="crop_name"
+    )
+    assert int((wide.nunique(axis=1) > 1).sum()) == 2
+
+
+def test_incomplete_crop_grid_fails_loudly(runtime):
+    path = (
+        runtime
+        / "data-pipeline"
+        / "growers"
+        / "il-grower"
+        / "farms"
+        / "il-farm"
+        / "derived"
+        / "tables"
+        / "il-farm_2021_cdl.csv"
+    )
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join(lines[:-1]) + "\n", encoding="utf-8")
+    with pytest.raises(PortfolioError, match="missing 1 field-year"):
+        dataset.build_portfolio(root=runtime)
+
+
+# --------------------------------------------------------------------------
 # runner
 # --------------------------------------------------------------------------
 
@@ -353,6 +409,36 @@ def test_run_writes_every_file_it_declares(runtime):
     assert len(table) == 4
     assert table["area_ha"].gt(0).all()
     assert table["weather_cell"].notna().all()
+
+
+def test_cdl_stage_writes_three_records(runtime):
+    from field_portfolio import run
+
+    out_dir = runtime / "cdl-out"
+    exit_code = run.main(
+        [
+            "--root",
+            str(runtime),
+            "--out-dir",
+            str(out_dir),
+            "--stage",
+            "cdl",
+            "--skip-validate",
+        ]
+    )
+    assert exit_code == 0
+
+    analysis = json.loads((out_dir / "analysis.json").read_text(encoding="utf-8"))
+    assert [figure["id"] for figure in analysis["figures"]] == [
+        "c1_crop_mix_by_year",
+        "c2_crop_sequence",
+        "c3_crop_transitions",
+    ]
+    assert [figure["n"] for figure in analysis["figures"]] == [20, 4, 16]
+    for record in analysis["figures"]:
+        assert (out_dir / record["file"]).exists()
+        assert record["caveat"]
+        assert record["category"] == "crop history"
 
 
 def test_run_refuses_an_unbuilt_stage(runtime):

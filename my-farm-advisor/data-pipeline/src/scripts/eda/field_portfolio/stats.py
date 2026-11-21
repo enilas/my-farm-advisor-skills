@@ -14,6 +14,7 @@ Three rules this module enforces so the figures cannot overclaim:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -87,6 +88,67 @@ class MeanDifference:
             "n_a": self.n_a,
             "n_b": self.n_b,
         }
+
+
+@dataclass(frozen=True)
+class Association:
+    """Chi-square test of independence with Cramér's V as the effect size."""
+
+    chi2: float
+    p: float
+    dof: int
+    cramers_v: float
+    n: int
+    min_expected: float
+
+    def as_dict(self) -> dict:
+        return {
+            "test": "chi_square_independence",
+            "chi2": round(self.chi2, 4),
+            "p": round(self.p, 6),
+            "dof": self.dof,
+            "effect": "cramers_v",
+            "effect_value": round(self.cramers_v, 4),
+            "n": self.n,
+            "min_expected": round(self.min_expected, 3),
+        }
+
+
+def chi_square(table) -> Association:
+    """Test association in a contingency table, without Yates correction.
+
+    ``table`` is any 2-D count array. Cramér's V is computed from the same
+    statistic; the minimum expected count is returned so a caller can state
+    whether the asymptotic p is trustworthy. No continuity correction: the
+    transition table has a structural zero, and Yates would move the p-value
+    without changing the conclusion.
+    """
+    from scipy import stats
+
+    counts = np.asarray(table, dtype=float)
+    if counts.ndim != 2 or min(counts.shape) < 2:
+        raise ValueError(f"chi_square needs a 2-D table with >=2 rows and columns, got {counts.shape}")
+    if (counts < 0).any():
+        raise ValueError("chi_square does not accept negative counts")
+    n = int(counts.sum())
+    if n == 0:
+        raise ValueError("chi_square needs at least one observation")
+    result = stats.chi2_contingency(counts, correction=False)
+    chi2, p, dof, expected = (
+        float(result.statistic),
+        float(result.pvalue),
+        int(result.dof),
+        np.asarray(result.expected_freq, dtype=float),
+    )
+    cramers_v = math.sqrt(chi2 / (n * (min(counts.shape) - 1)))
+    return Association(
+        chi2=chi2,
+        p=p,
+        dof=dof,
+        cramers_v=cramers_v,
+        n=n,
+        min_expected=float(expected.min()),
+    )
 
 
 def _clean_pair(x, y) -> tuple[np.ndarray, np.ndarray]:

@@ -24,25 +24,19 @@ from matplotlib.ticker import FuncFormatter
 from shapely.geometry import LineString, box as shape_box
 
 from lib.field_frame import Frame, crs_note, decorate, frame_for, view_extent
-from lib.palettes import categorical
 
 from . import dataset, stats
 from .dataset import Portfolio
+from .viz import (
+    grower_colors,
+    grower_labels,
+    ordered_growers,
+    save_figure,
+    stat_box,
+    style,
+)
 
 SEED = stats.DEFAULT_SEED
-
-# Stable colour per state so the same grower is the same colour in every
-# figure and in the later report. Unknown states fall back to Okabe-Ito.
-_STATE_COLORS = {
-    "IL": "#0072B2",  # blue
-    "IA": "#E69F00",  # orange
-    "NE": "#009E73",  # green
-    "MN": "#CC79A7",
-    "IN": "#56B4E9",
-    "MO": "#D55E0E",
-    "KS": "#F0E442",
-}
-GROWER_ORDER_HINT = ("IL", "IA", "NE")
 
 GEOMETRY_METRICS = [
     ("area_ha", "area (ha)"),
@@ -53,97 +47,6 @@ GEOMETRY_METRICS = [
     ("vertex_count", "vertices"),
     ("mean_lat", "latitude"),
 ]
-
-
-def style() -> None:
-    plt.rcParams.update(
-        {
-            "figure.facecolor": "white",
-            "axes.facecolor": "white",
-            "axes.edgecolor": "#4B5563",
-            "axes.labelcolor": "#111827",
-            "text.color": "#111827",
-            "xtick.color": "#374151",
-            "ytick.color": "#374151",
-            "axes.titlesize": 13,
-            "axes.titleweight": "bold",
-            "axes.labelsize": 10,
-            "font.size": 10,
-            "legend.fontsize": 9,
-            "axes.grid": True,
-            "grid.color": "#E5E7EB",
-            "grid.linewidth": 0.7,
-            "figure.dpi": 150,
-            "savefig.dpi": 150,
-            "savefig.bbox": "tight",
-        }
-    )
-
-
-def grower_labels(pf: Portfolio) -> dict[str, str]:
-    """Display label per grower: the state code when the tree is consistent."""
-    labels: dict[str, str] = {}
-    for grower in pf.growers:
-        states = [
-            str(value)
-            for value in pf.fields_table.loc[
-                pf.fields_table["grower_slug"] == grower, "state"
-            ].dropna()
-            if str(value).strip()
-        ]
-        labels[grower] = states[0] if states else grower
-    return labels
-
-
-def grower_colors(pf: Portfolio) -> dict[str, str]:
-    labels = grower_labels(pf)
-    ordered = sorted(
-        labels,
-        key=lambda g: (
-            GROWER_ORDER_HINT.index(labels[g]) if labels[g] in GROWER_ORDER_HINT else 99,
-            labels[g],
-        ),
-    )
-    fallback = categorical(max(len(ordered), 1))
-    colors: dict[str, str] = {}
-    spare = iter(fallback)
-    for grower in ordered:
-        colors[grower] = _STATE_COLORS.get(labels[grower]) or next(spare)
-    return colors
-
-
-def _ordered_growers(pf: Portfolio, colors: dict[str, str]) -> list[str]:
-    labels = grower_labels(pf)
-    return sorted(
-        pf.growers,
-        key=lambda g: (
-            GROWER_ORDER_HINT.index(labels[g]) if labels[g] in GROWER_ORDER_HINT else 99,
-            labels[g],
-        ),
-    )
-
-
-def _save(fig, path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path)
-    plt.close(fig)
-    return path
-
-
-def _stat_box(ax, lines: list[str], loc: str = "upper left") -> None:
-    ax.text(
-        0.015 if "left" in loc else 0.985,
-        0.975 if "upper" in loc else 0.025,
-        "\n".join(lines),
-        transform=ax.transAxes,
-        ha="left" if "left" in loc else "right",
-        va="top" if "upper" in loc else "bottom",
-        fontsize=8.4,
-        family="DejaVu Sans Mono",
-        linespacing=1.45,
-        bbox=dict(boxstyle="round,pad=0.45", fc="white", ec="#D1D5DB", lw=0.9, alpha=0.95),
-        zorder=6,
-    )
 
 
 def _north_arrow_spot(framed, extent) -> tuple[str, tuple[float, float]]:
@@ -192,7 +95,7 @@ def _headroom(ax, frac: float = 0.20) -> None:
 def figure_area_distribution(pf: Portfolio, out_dir: Path) -> dict:
     colors = grower_colors(pf)
     labels = grower_labels(pf)
-    growers = _ordered_growers(pf, colors)
+    growers = ordered_growers(pf, colors)
     table = pf.fields_table
 
     fig, ax = plt.subplots(figsize=(9.6, 6.2))
@@ -261,7 +164,7 @@ def figure_area_distribution(pf: Portfolio, out_dir: Path) -> dict:
     ax.legend(loc="upper right", frameon=True, framealpha=0.95)
     _headroom(ax, 0.22)
 
-    _stat_box(
+    stat_box(
         ax,
         [
             f"Kruskal-Wallis  H={test.h:.2f}  {stats.format_p(test.p)}",
@@ -294,7 +197,7 @@ def figure_area_distribution(pf: Portfolio, out_dir: Path) -> dict:
         color="#6B7280",
     )
 
-    path = _save(fig, out_dir / "figures" / "b1_area_distribution.png")
+    path = save_figure(fig, out_dir / "figures" / "b1_area_distribution.png")
     return {
         "id": "b1_area_distribution",
         "file": "figures/b1_area_distribution.png",
@@ -328,7 +231,7 @@ def figure_area_distribution(pf: Portfolio, out_dir: Path) -> dict:
 def figure_area_vs_shape(pf: Portfolio, out_dir: Path) -> dict:
     colors = grower_colors(pf)
     labels = grower_labels(pf)
-    growers = _ordered_growers(pf, colors)
+    growers = ordered_growers(pf, colors)
     table = pf.fields_table
 
     fig, ax = plt.subplots(figsize=(9.4, 6.4))
@@ -369,7 +272,7 @@ def figure_area_vs_shape(pf: Portfolio, out_dir: Path) -> dict:
     ax.legend(loc="lower right", frameon=True, framealpha=0.95)
     _headroom(ax, 0.24)
 
-    _stat_box(
+    stat_box(
         ax,
         [
             f"pooled Spearman rho = {pooled.rho:+.2f}",
@@ -387,7 +290,7 @@ def figure_area_vs_shape(pf: Portfolio, out_dir: Path) -> dict:
         color="#6B7280",
     )
 
-    path = _save(fig, out_dir / "figures" / "b2_area_vs_shape.png")
+    path = save_figure(fig, out_dir / "figures" / "b2_area_vs_shape.png")
     if pooled.ci_low is not None and pooled.ci_low <= 0.0 <= pooled.ci_high:
         direction = "no evidence of a monotone size-shape trend (the 95% CI includes zero)"
     elif pooled.rho > 0:
@@ -501,7 +404,7 @@ def figure_geometry_correlation(pf: Portfolio, out_dir: Path) -> dict:
         bbox=dict(boxstyle="round,pad=0.5", fc="#F9FAFB", ec="#D1D5DB", lw=0.9),
     )
 
-    path = _save(fig, out_dir / "figures" / "b3_geometry_correlation.png")
+    path = save_figure(fig, out_dir / "figures" / "b3_geometry_correlation.png")
     return {
         "id": "b3_geometry_correlation",
         "file": "figures/b3_geometry_correlation.png",
@@ -630,7 +533,7 @@ def figure_portfolio_overview(pf: Portfolio, out_dir: Path) -> dict:
     """One shared frame for all three farms, at the cost of field detail."""
     colors = grower_colors(pf)
     labels = grower_labels(pf)
-    growers = _ordered_growers(pf, colors)
+    growers = ordered_growers(pf, colors)
     table = pf.fields_table
 
     states = dataset.load_states(pf.base)
@@ -748,7 +651,7 @@ def figure_portfolio_overview(pf: Portfolio, out_dir: Path) -> dict:
         color="#4B5563",
     )
 
-    path = _save(fig, out_dir / "figures" / "m0_portfolio_overview.png")
+    path = save_figure(fig, out_dir / "figures" / "m0_portfolio_overview.png")
     return {
         "id": "m0_portfolio_overview",
         "file": "figures/m0_portfolio_overview.png",
@@ -794,7 +697,7 @@ def figure_portfolio_overview(pf: Portfolio, out_dir: Path) -> dict:
 def figure_layout_map(pf: Portfolio, out_dir: Path) -> dict:
     colors = grower_colors(pf)
     labels = grower_labels(pf)
-    growers = _ordered_growers(pf, colors)
+    growers = ordered_growers(pf, colors)
     table = pf.fields_table
 
     fig, axes = plt.subplots(
@@ -909,7 +812,7 @@ def figure_layout_map(pf: Portfolio, out_dir: Path) -> dict:
         color="#4B5563",
     )
 
-    path = _save(fig, out_dir / "figures" / "m1_fields_by_grower.png")
+    path = save_figure(fig, out_dir / "figures" / "m1_fields_by_grower.png")
     total_cells = int(table["weather_cell"].nunique())
     return {
         "id": "m1_fields_by_grower",

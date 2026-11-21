@@ -9,8 +9,9 @@ Examples
         scripts/eda/field_portfolio/run.py --stage boundaries
 
 Outputs land in ``<runtime>/derived/eda/field-portfolio`` unless ``--out-dir``
-says otherwise. Stage 1 (boundaries) is implemented; cdl and weather are
-planned and exit with a clear message rather than writing half a set.
+says otherwise. Stages are additive: ``boundaries`` writes the size/shape and
+map set, ``cdl`` writes the crop-history set, and ``all`` writes both. Weather
+is still planned and exits with a clear message rather than half a set.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ from field_portfolio import dataset  # noqa: E402
 from field_portfolio.dataset import PortfolioError  # noqa: E402
 
 STAGES = ("boundaries", "cdl", "weather", "all")
-BUILT_STAGES = ("boundaries",)
+BUILT_STAGES = ("boundaries", "cdl", "all")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -142,8 +143,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.stage not in BUILT_STAGES:
         print(
-            f"stage {args.stage!r} is not built yet. Stage 1 ships boundaries only;\n"
-            "cdl and weather will land as their own reviewable stages.",
+            f"stage {args.stage!r} is not built yet. Boundaries and cdl ship;\n"
+            "weather will land as its own reviewable stage.",
             file=sys.stderr,
         )
         return 2
@@ -172,11 +173,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    if args.stage == "boundaries":
+    records: list[dict] = []
+    if args.stage in ("boundaries", "all"):
         from field_portfolio import figures_boundary
 
-        records = figures_boundary.build_all(portfolio, out_dir)
-    else:  # pragma: no cover - guarded above
+        records.extend(figures_boundary.build_all(portfolio, out_dir))
+    if args.stage in ("cdl", "all"):
+        from field_portfolio import figures_cdl
+
+        records.extend(figures_cdl.build_all(portfolio, out_dir))
+    if not records:  # pragma: no cover - guarded above
         raise AssertionError(args.stage)
 
     table_path = out_dir / "tables" / "table_fields.csv"
@@ -197,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "unit_of_analysis": {
             "boundaries": "field (n per grower)",
-            "cdl": "field-year (planned)",
+            "cdl": "field-year (dominant CDL class; 5 years per field)",
             "weather": "NASA POWER cell / site-year (planned); fields are not independent samples",
         },
         "tables": {"fields": "tables/table_fields.csv"},

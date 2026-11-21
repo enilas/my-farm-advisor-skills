@@ -79,7 +79,10 @@ cd "${DATA_PIPELINE_DATA_ROOT}/data-pipeline/src"
   `<runtime>/data-pipeline/derived/eda/field-portfolio`.
 - `--require-layers weather,cdl|none` relaxes the layer gate (recorded).
 - `--skip-validate` is recorded in the manifest; avoid it for real runs.
-- The `cdl`, `weather`, and `all` stages exit with a message until built.
+- `--stage boundaries` writes B1–B3, M0 and M1; `--stage cdl` writes C1–C3;
+  `--stage all` writes both sets. The weather stage is not built yet.
+- A stage rewrites `analysis.json` with the figures it just drew. Use a
+  separate `--out-dir` per review stage, or finish with `--stage all`.
 
 Install/refresh the runtime source before a run when the checkout changed:
 
@@ -94,6 +97,7 @@ DATA_PIPELINE_DATA_ROOT="$DATA_PIPELINE_DATA_ROOT" \
 ```
 derived/eda/field-portfolio/
   figures/                 m0_*.png m1_*.png b1_*.png b2_*.png b3_*.png
+                           c1_*.png c2_*.png c3_*.png
   tables/table_fields.csv  one row per field, stable column order
   analysis.json            the contract the report consumes
   manifest.json            inputs/outputs with sha256, validator status, git head
@@ -121,7 +125,7 @@ derived/eda/field-portfolio/
 A report renders this; it must not recompute or re-derive the numbers. If a
 figure's message changes, change the record here, not in the report.
 
-## Figures and What They Tell
+## Boundary Figures and What They Tell
 
 ### B1 — `b1_area_distribution.png`
 
@@ -169,6 +173,41 @@ layouts differ and how many weather cells hide behind 10 fields. On the
 assignment-2 portfolio: 30 fields, 17,909 acres, 10 NASA POWER cells — IL 3,
 IA 4, NE 3 — so field-level weather is not independent.
 
+## Crop-History Figures and What They Tell
+
+The unit is the field-year; the years are 2019–2023. Every figure uses the
+dominant CDL class per field-year, because minority edge classes never win:
+all 150 field-years are Corn or Soybeans.
+
+### C1 — `c1_crop_mix_by_year.png`
+
+100% stacked bars per grower and year, labelled with field counts. Tells how
+the planted mix is distributed and whether one grower leans a crop. On the
+assignment-2 portfolio: corn covers 86 of 150 field-years (57%); IL 29/50,
+IA 24/50, NE 33/50. Every year keeps the same two-crop split, so the mix is
+stable and the grower difference is a level, not a trend.
+
+### C2 — `c2_crop_sequence.png`
+
+One row per field, one column per year, sorted by 5-year sequence; amber is
+corn, green is soybeans, and white rules separate distinct sequences. Tells
+what each field actually did, including the exceptions a summary hides. On the
+assignment-2 portfolio: 26 of 30 fields change crop at least once; 4 stay in
+continuous corn (1 IL, 3 NE) and none stay in soybeans; five distinct
+sequences appear.
+
+### C3 — `c3_crop_transitions.png`
+
+Left: 2×2 transition matrix with counts, row shares, the chi-square test and
+Cramér's V. Right: the share of year-to-year transitions that change crop, by
+grower, against the pooled rate. Tells whether the next crop depends on the
+current one and whether every grower rotates alike. On the assignment-2
+portfolio: 82.5% of 120 transitions switch crop; soybeans are followed by corn
+100% of the time, corn by corn 30%; χ² = 59.2, df = 1, p < 0.001, V = 0.70.
+Switch rates are IL 90%, IA 98%, NE 60%; the 21 same-crop transitions are all
+corn (NE 16, IL 4, IA 1). The 120 pairs overlap (four per field), so the
+p-value is descriptive, not a population test.
+
 ## Conventions
 
 - **GDD**: base 10 °C, upper cap 30 °C on Tmax,
@@ -193,9 +232,8 @@ IA 4, NE 3 — so field-level weather is not independent.
 
 ## Extending
 
-- Stage 2 (CDL): add `figures_cdl.py`, register it in `run.py`, and add the
-  records. Follow the same four-figure shape: two statistical views, one
-  correlation/comparison, one map.
+- Stage 2 (CDL) is built in `figures_cdl.py`; extend it with the same
+  field-year unit and the same contract fields.
 - Stage 3 (weather): add `figures_weather.py`, aggregate to cell-year before
   testing, and report the cell count next to every n.
 - Reuse `metrics.py` for GDD/frost so all stages use one definition.
