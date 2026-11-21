@@ -56,6 +56,10 @@ cd "$DATA_PIPELINE_DATA_ROOT/data-pipeline/src"
   scripts/eda/field_portfolio/run.py --stage all
 ```
 
+The same two steps, plus an output summary, are available as one command:
+`./scripts/run-eda-field-portfolio.sh` from `../../data-pipeline` (defaults to
+`--stage all` and a source refresh).
+
 Run `./scripts/validate.sh` from the repository root after structural changes.
 Open every written PNG and pass the figure review in `../../../CONTRIBUTING.md`
 before committing; record the verdict in the commit message.

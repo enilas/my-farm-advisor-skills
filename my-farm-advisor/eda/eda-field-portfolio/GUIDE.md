@@ -85,7 +85,25 @@ cd "${DATA_PIPELINE_DATA_ROOT}/data-pipeline/src"
 - A stage rewrites `analysis.json` with the figures it just drew. Use a
   separate `--out-dir` per review stage, or finish with `--stage all`.
 
-Install/refresh the runtime source before a run when the checkout changed:
+### One-command run
+
+For a demo or a repeatable check, the wrapper at
+`data-pipeline/scripts/run-eda-field-portfolio.sh` refreshes the runtime
+source, runs the stage, and summarizes what landed on disk. From
+`my-farm-advisor/data-pipeline`:
+
+```bash
+./scripts/run-eda-field-portfolio.sh
+```
+
+It defaults to `--stage all`, refreshes the runtime source first (skip with
+`--no-refresh`), writes the canonical output dir, and ends with the figure
+count per category plus the manifest head and validator status. `--stage`,
+`--out-dir`, `--root`, and `--skip-validate` behave as above. The explicit
+`python run.py` form above is what the wrapper calls.
+
+When the checkout changed, refresh the runtime source before a manual run (the
+wrapper does this by default):
 
 ```bash
 cd my-farm-advisor/data-pipeline
