@@ -22,8 +22,9 @@ paths, the installer, or output locations.
 
 ## Local rules
 
-- Stage 1 (`boundaries`) is the only built stage. Do not add CDL or weather
-  figures to the same change; each stage is reviewed on its own.
+- Stages `boundaries`, `cdl`, and `weather` are built. Review each stage on
+  its own: a new figure belongs in its stage's `figures_*.py`, not bolted onto
+  another stage's module.
 - Every figure writes one `analysis.json` record with `n`, `unit`, `stat`,
   `finding`, and `caveat`. A figure without a record, or a record whose finding
   disagrees with the render, is a bug.
@@ -52,7 +53,7 @@ DATA_PIPELINE_DATA_ROOT="$DATA_PIPELINE_DATA_ROOT" \
   ./scripts/install.sh --non-interactive --force-refresh --no-install-deps
 cd "$DATA_PIPELINE_DATA_ROOT/data-pipeline/src"
 "$DATA_PIPELINE_DATA_ROOT/data-pipeline/.venv/bin/python" \
-  scripts/eda/field_portfolio/run.py --stage boundaries
+  scripts/eda/field_portfolio/run.py --stage all
 ```
 
 Run `./scripts/validate.sh` from the repository root after structural changes.

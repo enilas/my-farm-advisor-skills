@@ -80,7 +80,7 @@ cd "${DATA_PIPELINE_DATA_ROOT}/data-pipeline/src"
 - `--require-layers weather,cdl|none` relaxes the layer gate (recorded).
 - `--skip-validate` is recorded in the manifest; avoid it for real runs.
 - `--stage boundaries` writes B1–B3, M0 and M1; `--stage cdl` writes C1–C3;
-  `--stage all` writes both sets. The weather stage is not built yet.
+  `--stage weather` writes W1–W3; `--stage all` writes every set.
 - A stage rewrites `analysis.json` with the figures it just drew. Use a
   separate `--out-dir` per review stage, or finish with `--stage all`.
 
@@ -98,6 +98,7 @@ DATA_PIPELINE_DATA_ROOT="$DATA_PIPELINE_DATA_ROOT" \
 derived/eda/field-portfolio/
   figures/                 m0_*.png m1_*.png b1_*.png b2_*.png b3_*.png
                            c1_*.png c2_*.png c3_*.png
+                           w1_*.png w2_*.png w3_*.png
   tables/table_fields.csv  one row per field, stable column order
   analysis.json            the contract the report consumes
   manifest.json            inputs/outputs with sha256, validator status, git head
@@ -208,6 +209,41 @@ Switch rates are IL 90%, IA 98%, NE 60%; the 21 same-crop transitions are all
 corn (NE 16, IL 4, IA 1). The 120 pairs overlap (four per field), so the
 p-value is descriptive, not a population test.
 
+## Weather Figures and What They Tell
+
+Weather is computed on the NASA POWER cell, then rolled to cell-year: 10 cells
+× 5 years = 50 site-years. Field-day rows never enter a test. Cell values are
+the mean of the field samples inside the cell.
+
+### W1 — `w1_gdd_by_site_year.png`
+
+Box and strip of seasonal GDD per grower, with a Kruskal-Wallis test and ε²;
+the box shows the five-year spread inside a state. Tells whether the heat
+budget is a location or a year effect. On the assignment-2 portfolio: medians
+IL 1796, IA 1666, NE 1957 GDD; H = 40.2, p < 0.001, ε² = 0.81. The cell-mean
+check over 10 cells still separates (p = 0.018). The within-cell spread
+(median 146, max 202 GDD) is wider than the 130 GDD IL–IA median gap, so the
+cooler two groups overlap; the hottest group does not.
+
+### W2 — `w2_frost_window.png`
+
+One horizontal line per site-year from last spring frost to first fall frost,
+ordered by spring date within grower; tick labels give each grower's median
+season length. Tells when the window opens and closes and how much it moves.
+On the assignment-2 portfolio: 164–213 days (median 187); IL 193 days
+(174–210), IA 181 (164–202), NE 193 (181–213). Spring frosts cluster in the
+third week of April, fall frosts in late October to early November; the
+grower contrast is about two weeks, not a different season type.
+
+### W3 — `w3_precip_vs_gdd.png`
+
+Scatter of April–September precipitation against seasonal GDD, coloured by
+grower, with a pooled Spearman ρ, its bootstrap interval, and the sign of the
+within-year correlation. Tells whether the hotter sites are also the drier
+ones. On the assignment-2 portfolio: ρ = −0.52 (95% CI −0.73 to −0.24,
+p < 0.001, n = 50 site-years); the sign is negative in all five years, so the
+west-to-east moisture gradient is not a pooling artefact.
+
 ## Conventions
 
 - **GDD**: base 10 °C, upper cap 30 °C on Tmax,
@@ -232,10 +268,12 @@ p-value is descriptive, not a population test.
 
 ## Extending
 
-- Stage 2 (CDL) is built in `figures_cdl.py`; extend it with the same
-  field-year unit and the same contract fields.
-- Stage 3 (weather): add `figures_weather.py`, aggregate to cell-year before
-  testing, and report the cell count next to every n.
+- Crop history lives in `figures_cdl.py`; keep the field-year unit and the
+  dominant-class rule.
+- Weather lives in `figures_weather.py`; aggregate to cell-year before testing
+  and report the cell count next to every n.
+- A new category gets its own `figures_*.py` and its own `--stage` value; do
+  not grow an existing module past its category.
 - Reuse `metrics.py` for GDD/frost so all stages use one definition.
 - Keep `lib/field_frame.py` and `lib/palettes.py` read-only; if a frame or
   palette change is needed, change the library and re-review every figure it

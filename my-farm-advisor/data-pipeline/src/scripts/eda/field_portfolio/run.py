@@ -10,8 +10,8 @@ Examples
 
 Outputs land in ``<runtime>/derived/eda/field-portfolio`` unless ``--out-dir``
 says otherwise. Stages are additive: ``boundaries`` writes the size/shape and
-map set, ``cdl`` writes the crop-history set, and ``all`` writes both. Weather
-is still planned and exits with a clear message rather than half a set.
+map set, ``cdl`` the crop-history set, ``weather`` the cell-year climate set,
+and ``all`` writes every stage.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from field_portfolio import dataset  # noqa: E402
 from field_portfolio.dataset import PortfolioError  # noqa: E402
 
 STAGES = ("boundaries", "cdl", "weather", "all")
-BUILT_STAGES = ("boundaries", "cdl", "all")
+BUILT_STAGES = ("boundaries", "cdl", "weather", "all")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -143,8 +143,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.stage not in BUILT_STAGES:
         print(
-            f"stage {args.stage!r} is not built yet. Boundaries and cdl ship;\n"
-            "weather will land as its own reviewable stage.",
+            f"stage {args.stage!r} is not built yet.",
             file=sys.stderr,
         )
         return 2
@@ -182,6 +181,10 @@ def main(argv: list[str] | None = None) -> int:
         from field_portfolio import figures_cdl
 
         records.extend(figures_cdl.build_all(portfolio, out_dir))
+    if args.stage in ("weather", "all"):
+        from field_portfolio import figures_weather
+
+        records.extend(figures_weather.build_all(portfolio, out_dir))
     if not records:  # pragma: no cover - guarded above
         raise AssertionError(args.stage)
 
@@ -204,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         "unit_of_analysis": {
             "boundaries": "field (n per grower)",
             "cdl": "field-year (dominant CDL class; 5 years per field)",
-            "weather": "NASA POWER cell / site-year (planned); fields are not independent samples",
+            "weather": "NASA POWER cell / site-year; fields are not independent samples",
         },
         "tables": {"fields": "tables/table_fields.csv"},
         "figures": records,

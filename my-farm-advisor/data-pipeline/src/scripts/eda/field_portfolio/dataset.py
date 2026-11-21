@@ -22,13 +22,15 @@ import hashlib
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+
+from . import metrics
 
 EQUAL_AREA_CRS = "EPSG:5070"
 BOUNDARY_CRS = "EPSG:4326"
@@ -372,6 +374,8 @@ class Portfolio:
     cdl: pd.DataFrame
     sequence: pd.DataFrame
     cdl_years: dict[str, list[int]]
+    cell_days: pd.DataFrame = field(default_factory=pd.DataFrame)
+    site_years: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     @property
     def growers(self) -> list[str]:
@@ -383,6 +387,112 @@ class Portfolio:
     @property
     def cell_count(self) -> int:
         return int(self.fields_table["weather_cell"].nunique())
+
+
+WEATHER_MEASURES = (
+    "T2M",
+    "T2M_MAX",
+    "T2M_MIN",
+    "PRECTOTCORR",
+    "RH2M",
+    "WS10M",
+    "ALLSKY_SFC_SW_DWN",
+)
+
+
+def cell_weather(pf: Portfolio) -> pd.DataFrame:
+    """Average the field samples inside each NASA POWER cell, per day.
+
+    NASA POWER is gridded; several fields (and sometimes several sample
+    points) sit in one cell. Aggregating to the cell is what makes the later
+    inference honest — 30 fields are not 30 independent climates. A cell must
+    belong to one grower; a shared cell would make one farm's climate stand in
+    for another's.
+    """
+    if pf.weather.empty:
+        return pd.DataFrame(
+            columns=["weather_cell", "date", "grower_slug", "state", *WEATHER_MEASURES]
+        )
+    cell_by_field = pf.fields_table.set_index("field_id")["weather_cell"]
+    frame = pf.weather.copy()
+    frame["weather_cell"] = frame["field_id"].map(cell_by_field)
+    orphan = frame["weather_cell"].isna()
+    if orphan.any():
+        raise PortfolioError(
+            f"{int(orphan.sum())} weather row(s) belong to fields outside the portfolio"
+        )
+    shared = pf.fields_table.groupby("weather_cell")["grower_slug"].nunique()
+    if (shared > 1).any():
+        offenders = shared[shared > 1].index.tolist()
+        raise PortfolioError(
+            f"weather cell(s) {offenders} host more than one grower; "
+            "cell-level weather would not be attributable"
+        )
+    meta = (
+        pf.fields_table.groupby("weather_cell", as_index=False)
+        .agg(
+            grower_slug=("grower_slug", "first"),
+            state=("state", "first"),
+            fields=("field_id", "size"),
+        )
+    )
+    measures = [column for column in WEATHER_MEASURES if column in frame.columns]
+    days = frame.groupby(["weather_cell", "date"], as_index=False)[measures].mean(
+        numeric_only=True
+    )
+    return (
+        days.merge(meta, on="weather_cell", how="left")
+        .sort_values(["weather_cell", "date"], kind="stable")
+        .reset_index(drop=True)
+    )
+
+
+def cell_year_metrics(pf: Portfolio, cell_days: pd.DataFrame | None = None) -> pd.DataFrame:
+    """One row per cell-year: seasonal GDD, precipitation, and frost window.
+
+    ``days`` in the result is the number of daily records behind the row, so a
+    short or split year is visible rather than silently averaged.
+    """
+    days = cell_weather(pf) if cell_days is None else cell_days
+    columns = [
+        "weather_cell",
+        "year",
+        "grower_slug",
+        "state",
+        "gdd",
+        "precip_mm",
+        "spring_frost",
+        "fall_frost",
+        "season_days",
+        "days",
+    ]
+    if days.empty:
+        return pd.DataFrame(columns=columns)
+    rows: list[dict] = []
+    for (cell, year), group in days.groupby(
+        ["weather_cell", days["date"].dt.year], sort=True
+    ):
+        group = group.sort_values("date")
+        gdd = metrics.growing_degree_days(group["T2M_MIN"], group["T2M_MAX"])
+        in_season = (group["date"].dt.month >= 4) & (group["date"].dt.month <= 9)
+        frost = metrics.frost_window(group["date"], group["T2M_MIN"])
+        rows.append(
+            {
+                "weather_cell": cell,
+                "year": int(year),
+                "grower_slug": group["grower_slug"].iloc[0],
+                "state": group["state"].iloc[0],
+                "gdd": float(gdd[in_season].sum()),
+                "precip_mm": metrics.season_precip(
+                    group["date"], group["PRECTOTCORR"]
+                ),
+                "spring_frost": frost.last_spring_frost,
+                "fall_frost": frost.first_fall_frost,
+                "season_days": frost.season_length_days,
+                "days": int(len(group)),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _read_farm_meta(farm: FarmRef) -> dict:
@@ -533,7 +643,7 @@ def build_portfolio(
             ["grower_slug", "farm_slug", "field_id", "year"], kind="stable"
         ).reset_index(drop=True)
 
-    return Portfolio(
+    portfolio = Portfolio(
         base=base,
         farms=farms,
         fields=fields,
@@ -543,6 +653,9 @@ def build_portfolio(
         sequence=sequence_frame,
         cdl_years=years_by_farm,
     )
+    portfolio.cell_days = cell_weather(portfolio)
+    portfolio.site_years = cell_year_metrics(portfolio, portfolio.cell_days)
+    return portfolio
 
 
 # --------------------------------------------------------------------------

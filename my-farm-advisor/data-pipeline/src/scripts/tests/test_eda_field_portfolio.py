@@ -90,14 +90,25 @@ def _write_farm(root: Path, grower: str, farm: str, state: str, specs, *, skip_c
     )
 
     rows = [WEATHER_COLUMNS]
+    start = pd.Timestamp("2021-01-01")
     for field_id, lon, lat, _crop, _acres in specs:
         if field_id == skip_weather_field:
             continue
-        for day in range(10):
-            date = pd.Timestamp("2021-01-01") + pd.Timedelta(days=day)
+        for day in range(365):
+            date = start + pd.Timedelta(days=day)
+            phase = 2 * np.pi * (date.day_of_year - 110) / 365
+            # A seasonal cycle with a latitude offset: frosts in spring and
+            # fall, a warm summer, and real between-cell GDD differences.
+            tmax = 10.0 + 15.0 * np.sin(phase) + 1.5 * (lat - 40.0)
+            tmin = tmax - 9.0
+            site_shift = int(abs(lon) * 10) % 5
+            precip = (
+                3.0 + 0.6 * site_shift if date.day_of_year % 5 == 0 else 0.0
+            )
             rows.append(
                 f"{field_id},{lat + 0.001},{lon + 0.001},{date.date()},"
-                "2.0,6.0,-2.0,1.5,8.0,80.0,3.0"
+                f"{(tmax + tmin) / 2:.1f},{tmax:.1f},{tmin:.1f},"
+                f"{precip:.1f},8.0,80.0,3.0"
             )
     (farm_dir / "derived" / "tables" / f"{farm}_weather_2021_2025.csv").write_text(
         "\n".join(rows) + "\n", encoding="utf-8"
@@ -364,6 +375,22 @@ def test_incomplete_crop_grid_fails_loudly(runtime):
 
 
 # --------------------------------------------------------------------------
+# weather
+# --------------------------------------------------------------------------
+
+
+def test_cell_year_metrics_collapse_fields_to_cells(runtime):
+    portfolio = dataset.build_portfolio(root=runtime)
+    cells = portfolio.fields_table["weather_cell"].nunique()
+    assert portfolio.cell_days.groupby(["weather_cell", "date"]).ngroups == cells * 365
+    assert len(portfolio.site_years) == cells
+    assert (portfolio.site_years["days"] == 365).all()
+    assert portfolio.site_years["gdd"].gt(0).all()
+    assert portfolio.site_years["season_days"].notna().all()
+    assert portfolio.site_years["season_days"].gt(0).all()
+
+
+# --------------------------------------------------------------------------
 # runner
 # --------------------------------------------------------------------------
 
@@ -441,7 +468,31 @@ def test_cdl_stage_writes_three_records(runtime):
         assert record["category"] == "crop history"
 
 
-def test_run_refuses_an_unbuilt_stage(runtime):
+def test_weather_stage_writes_three_records(runtime):
     from field_portfolio import run
 
-    assert run.main(["--root", str(runtime), "--stage", "weather"]) == 2
+    out_dir = runtime / "weather-out"
+    exit_code = run.main(
+        [
+            "--root",
+            str(runtime),
+            "--out-dir",
+            str(out_dir),
+            "--stage",
+            "weather",
+            "--skip-validate",
+        ]
+    )
+    assert exit_code == 0
+
+    analysis = json.loads((out_dir / "analysis.json").read_text(encoding="utf-8"))
+    assert [figure["id"] for figure in analysis["figures"]] == [
+        "w1_gdd_by_site_year",
+        "w2_frost_window",
+        "w3_precip_vs_gdd",
+    ]
+    for record in analysis["figures"]:
+        assert record["unit"] == "site-year"
+        assert record["n"] == 4
+        assert (out_dir / record["file"]).exists()
+        assert record["caveat"]
