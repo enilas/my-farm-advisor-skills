@@ -18,8 +18,9 @@ PNG, every claim in `analysis.json` names its test, effect size, sample size,
 and caveat, and `manifest.json` hashes every input and output so a rerun is
 auditable.
 
-The workflow is deliberately staged. Stage 1 (boundaries) is implemented and
-reviewed; CDL and weather land as their own reviewable stages.
+The workflow is deliberately staged: `boundaries` (B1–B3 plus maps M0/M1),
+`cdl` (C1–C3), and `weather` (W1–W3) are each reviewable on their own, and
+`--stage all` writes the complete set.
 
 ## When to Use This Workflow
 
