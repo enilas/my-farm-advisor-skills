@@ -7,3 +7,4 @@ Open these guides when analyzing agricultural datasets, comparing conditions, or
 - [Correlate Guide](eda-correlate/GUIDE.md) - pairwise and multivariate relationships
 - [Time Series Guide](eda-time-series/GUIDE.md) - seasonal and longitudinal views
 - [Visualize Guide](eda-visualize/GUIDE.md) - charts, plots, and dashboards
+- [Field Portfolio Guide](eda-field-portfolio/GUIDE.md) - runnable cross-grower comparison of boundaries, crop history, and climate with static figures and a report contract
