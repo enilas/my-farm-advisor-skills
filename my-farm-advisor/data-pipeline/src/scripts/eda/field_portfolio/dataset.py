@@ -204,6 +204,38 @@ def boundary_metrics(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 # --------------------------------------------------------------------------
+# context layers (optional, never data)
+# --------------------------------------------------------------------------
+
+
+def geoadmin_states_path(base: Path) -> Path | None:
+    """State outlines used only as map context; absence must not fail a run."""
+    directory = base / "shared" / "geoadmin" / "l1_states"
+    for name in ("states_usa.geojson", "states_usa.parquet"):
+        candidate = directory / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def load_states(base: Path) -> gpd.GeoDataFrame | None:
+    """Load US states for locator context, or ``None`` when unavailable."""
+    path = geoadmin_states_path(base)
+    if path is None:
+        return None
+    try:
+        if path.suffix == ".parquet":
+            states = gpd.read_parquet(path)
+        else:
+            states = gpd.read_file(path)
+    except Exception:  # malformed payload is context, not a reason to stop
+        return None
+    if states.crs is None or "state_code" not in states.columns:
+        return None
+    return states
+
+
+# --------------------------------------------------------------------------
 # weather
 # --------------------------------------------------------------------------
 

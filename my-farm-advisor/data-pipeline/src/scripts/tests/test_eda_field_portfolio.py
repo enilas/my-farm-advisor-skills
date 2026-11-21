@@ -326,11 +326,16 @@ def test_run_writes_every_file_it_declares(runtime):
 
     assert analysis["dataset"]["fields"] == 4
     assert [figure["id"] for figure in analysis["figures"]] == [
+        "m0_portfolio_overview",
         "b1_area_distribution",
         "b2_area_vs_shape",
         "b3_geometry_correlation",
         "m1_fields_by_grower",
     ]
+    overview_stat = analysis["figures"][0]["stat"]
+    assert overview_stat["crs"] == "EPSG:5070"
+    assert overview_stat["states_source"] == "unavailable"
+    assert overview_stat["graticule_lines"] > 0
     for record in analysis["figures"]:
         assert (out_dir / record["file"]).exists()
         assert record["n"] == 4

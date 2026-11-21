@@ -1,4 +1,4 @@
-"""Boundary-layer figures: two statistical views, one correlation, one map.
+"""Boundary-layer figures: two statistical views, one correlation, two maps.
 
 Each figure answers one question and writes one analysis record. The record is
 the contract with the later report: it carries the number, the test, the
@@ -7,22 +7,26 @@ effect size, and the caveat, so no prose has to be re-derived downstream.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
 
+import geopandas as gpd
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import Normalize, to_rgba
+from matplotlib.ticker import FuncFormatter
+from shapely.geometry import LineString, box as shape_box
 
-from lib.field_frame import crs_note, decorate, frame_for, view_extent
+from lib.field_frame import Frame, crs_note, decorate, frame_for, view_extent
 from lib.palettes import categorical
 
-from . import stats
+from . import dataset, stats
 from .dataset import Portfolio
 
 SEED = stats.DEFAULT_SEED
@@ -529,6 +533,260 @@ def figure_geometry_correlation(pf: Portfolio, out_dir: Path) -> dict:
 
 
 # --------------------------------------------------------------------------
+# M0 — shared-frame overview
+# --------------------------------------------------------------------------
+
+_OVERVIEW_EPSG = 5070
+_NON_CONUS = {"AK", "HI", "PR", "VI", "GU", "AS", "MP"}
+
+
+def _true_north_vector(lon: float, lat: float, epsg: int) -> tuple[float, float]:
+    """Unit vector of TRUE north in a projected map's axes.
+
+    Albers x/y are not aligned with true north away from the central
+    meridian, so the arrow is measured rather than assumed to point up.
+    """
+    probe = gpd.GeoDataFrame(
+        geometry=[
+            gpd.points_from_xy([lon], [lat])[0],
+            gpd.points_from_xy([lon], [lat + 1e-4])[0],
+        ],
+        crs=4326,
+    ).to_crs(epsg)
+    dx = probe.geometry.iloc[1].x - probe.geometry.iloc[0].x
+    dy = probe.geometry.iloc[1].y - probe.geometry.iloc[0].y
+    magnitude = math.hypot(dx, dy) or 1.0
+    return dx / magnitude, dy / magnitude
+
+
+def _graticule(ax, extent, step: float = 2.0) -> int:
+    """Draw a geographic graticule that shows the Albers gridding curvature."""
+    x0, x1, y0, y1 = extent
+    window = gpd.GeoSeries([shape_box(x0, y0, x1, y1)], crs=_OVERVIEW_EPSG).to_crs(4326)
+    lon_lo, lat_lo, lon_hi, lat_hi = window.total_bounds
+
+    lines = []
+    for lon in np.arange(math.ceil(lon_lo / step) * step, lon_hi, step):
+        lats = np.linspace(lat_lo, lat_hi, 60)
+        lines.append(LineString(np.column_stack([np.full(lats.size, lon), lats])))
+    for lat in np.arange(math.ceil(lat_lo / step) * step, lat_hi, step):
+        lons = np.linspace(lon_lo, lon_hi, 60)
+        lines.append(LineString(np.column_stack([lons, np.full(lons.size, lat)])))
+
+    projected = gpd.GeoSeries(lines, crs=4326).to_crs(_OVERVIEW_EPSG)
+    for line in projected:
+        xs, ys = line.xy
+        ax.plot(xs, ys, color="#9CA3AF", lw=0.55, alpha=0.55, zorder=1)
+    return len(projected)
+
+
+def _locator_inset(ax, states, bounds) -> str:
+    """Small CONUS panel showing where the three clusters sit."""
+    inset = ax.inset_axes([0.745, 0.60, 0.235, 0.33])
+    inset.set_xticks([])
+    inset.set_yticks([])
+    for spine in inset.spines.values():
+        spine.set_color("#9CA3AF")
+        spine.set_linewidth(0.7)
+
+    if states is None:
+        inset.text(
+            0.5,
+            0.5,
+            "CONUS locator\nunavailable",
+            transform=inset.transAxes,
+            ha="center",
+            va="center",
+            fontsize=6.6,
+            color="#6B7280",
+        )
+        return "unavailable"
+
+    conus = states[~states["state_code"].isin(_NON_CONUS)].to_crs(_OVERVIEW_EPSG)
+    conus.plot(ax=inset, facecolor="#F3F4F6", edgecolor="#9CA3AF", lw=0.45, zorder=1)
+    inset.set_xlabel("")
+    inset.set_ylabel("")
+    bx0, by0, bx1, by1 = bounds
+    inset.add_patch(
+        mpatches.Rectangle(
+            (bx0, by0),
+            bx1 - bx0,
+            by1 - by0,
+            fill=False,
+            edgecolor="#B91C1C",
+            lw=1.1,
+            zorder=5,
+        )
+    )
+    cx0, cy0, cx1, cy1 = conus.total_bounds
+    inset.set_xlim(cx0, cx1)
+    inset.set_ylim(cy0, cy1)
+    inset.set_aspect("equal")
+    inset.set_title("CONUS locator", fontsize=6.6, pad=2.5, color="#4B5563")
+    return "geoadmin states"
+
+
+def figure_portfolio_overview(pf: Portfolio, out_dir: Path) -> dict:
+    """One shared frame for all three farms, at the cost of field detail."""
+    colors = grower_colors(pf)
+    labels = grower_labels(pf)
+    growers = _ordered_growers(pf, colors)
+    table = pf.fields_table
+
+    states = dataset.load_states(pf.base)
+    fields = pf.fields.to_crs(_OVERVIEW_EPSG)
+    x0, y0, x1, y1 = fields.total_bounds
+    extent = view_extent(x0, x1, y0, y1, pad_frac=0.08)
+
+    fig, ax = plt.subplots(figsize=(11.4, 6.0), layout="constrained")
+    if states is not None:
+        states.to_crs(_OVERVIEW_EPSG).plot(
+            ax=ax, facecolor="#F9FAFB", edgecolor="#D1D5DB", lw=0.5, zorder=0
+        )
+
+    drawn = _graticule(ax, extent)
+
+    handles = []
+    clusters = []
+    for grower in growers:
+        subset = pf.grower_fields(grower).to_crs(_OVERVIEW_EPSG)
+        subset.plot(
+            ax=ax,
+            color=colors[grower],
+            edgecolor="none",
+            linewidth=0.0,
+            zorder=4,
+        )
+        handles.append(
+            mpatches.Patch(
+                facecolor=colors[grower],
+                edgecolor="white",
+                linewidth=0.8,
+                label=f"{labels[grower]} · {len(subset)} fields",
+            )
+        )
+        center = subset.geometry.union_all().centroid
+        ax.annotate(
+            f"{labels[grower]} · {len(subset)} fields",
+            xy=(center.x, center.y),
+            xytext=(0, 15),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9.2,
+            fontweight="bold",
+            color="#111827",
+            zorder=8,
+            path_effects=[path_effects.withStroke(linewidth=2.6, foreground="white")],
+        )
+        clusters.append(
+            {
+                "label": labels[grower],
+                "fields": len(subset),
+                "center_lon": round(
+                    float(subset.to_crs(4326).geometry.union_all().centroid.x), 3
+                ),
+                "center_lat": round(
+                    float(subset.to_crs(4326).geometry.union_all().centroid.y), 3
+                ),
+            }
+        )
+
+    ax.set_xlim(extent[0], extent[1])
+    ax.set_ylim(extent[2], extent[3])
+    ax.set_aspect("equal")
+    ax.grid(False)
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value / 1000:,.0f}"))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value / 1000:,.0f}"))
+    ax.tick_params(labelsize=8.2)
+    ax.set_xlabel("easting (km) — EPSG:5070 Albers equal-area", fontsize=8.6)
+    ax.set_ylabel("northing (km)", fontsize=8.6)
+
+    lon_c, lat_c = (
+        fields.to_crs(4326).geometry.union_all().centroid.x,
+        fields.to_crs(4326).geometry.union_all().centroid.y,
+    )
+    adx, ady = _true_north_vector(lon_c, lat_c, _OVERVIEW_EPSG)
+    frame = Frame(
+        geometry=fields,
+        epsg=_OVERVIEW_EPSG,
+        rot=0.0,
+        e0=0.0,
+        n0=0.0,
+        lon0=lon_c,
+        lat0=lat_c,
+        adx=adx,
+        ady=ady,
+    )
+    decorate(ax, frame, arrow_r=0.07, arrow_fs=9.5, callout=False, arrow_xy=(0.055, 0.905))
+
+    ax.legend(
+        handles=handles,
+        loc="lower left",
+        frameon=True,
+        framealpha=0.94,
+        fontsize=7.8,
+        title="grower",
+        title_fontsize=7.8,
+        borderpad=0.5,
+    )
+    states_source = _locator_inset(ax, states, fields.total_bounds)
+
+    width_km = (x1 - x0) / 1000
+    height_km = (y1 - y0) / 1000
+    median_width_km = float(np.sqrt(table["area_ha"] * 1e4).median()) / 1000
+    width_share = 100 * median_width_km / width_km
+
+    title = f"One frame, {len(table)} fields across {width_km:.0f} km"
+    ax.set_title(title, fontsize=13.5, pad=10)
+    fig.supxlabel(
+        "EPSG:5070, axes in km. At this scale a median field is "
+        f"{median_width_km:.1f} km across — {width_share:.1f}% of the panel "
+        "width — so field shape is unreadable here; M1 is the field-shape view. "
+        "Graticule at 2°; the locator inset places the portfolio in CONUS.",
+        fontsize=7.4,
+        color="#4B5563",
+    )
+
+    path = _save(fig, out_dir / "figures" / "m0_portfolio_overview.png")
+    return {
+        "id": "m0_portfolio_overview",
+        "file": "figures/m0_portfolio_overview.png",
+        "category": "boundaries",
+        "scope": "across growers",
+        "title": title,
+        "question": "Where does the whole portfolio sit, and how far apart are the farms?",
+        "finding": (
+            f"All {len(table)} fields fall into {len(growers)} clusters spanning "
+            f"{width_km:.0f} km east-west and {height_km:.0f} km north-south. A median "
+            f"field is {median_width_km:.1f} km across, {width_share:.1f}% of the panel "
+            "width, so the shared frame is a location view, not a shape view."
+        ),
+        "n": len(table),
+        "unit": "field",
+        "stat": {
+            "test": "descriptive",
+            "n": len(table),
+            "crs": f"EPSG:{_OVERVIEW_EPSG}",
+            "x_span_km": round(width_km, 1),
+            "y_span_km": round(height_km, 1),
+            "median_field_width_km": round(median_width_km, 2),
+            "panel_width_share_pct": round(width_share, 2),
+            "graticule_step_deg": 2,
+            "graticule_lines": drawn,
+            "states_source": states_source,
+            "clusters": clusters,
+        },
+        "caveat": (
+            "The shared frame compresses each farm to a dot: distance between "
+            "clusters is honest, field shape and layout are not. Read shape in "
+            "M1. A single true-north arrow is drawn at the portfolio centre; "
+            "grid convergence shifts north by a few degrees across the panel."
+        ),
+    }
+
+
+# --------------------------------------------------------------------------
 # M1 — layout map
 # --------------------------------------------------------------------------
 
@@ -682,6 +940,7 @@ def figure_layout_map(pf: Portfolio, out_dir: Path) -> dict:
 def build_all(pf: Portfolio, out_dir: Path) -> list[dict]:
     style()
     return [
+        figure_portfolio_overview(pf, out_dir),
         figure_area_distribution(pf, out_dir),
         figure_area_vs_shape(pf, out_dir),
         figure_geometry_correlation(pf, out_dir),

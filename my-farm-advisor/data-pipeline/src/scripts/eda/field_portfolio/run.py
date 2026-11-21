@@ -213,6 +213,9 @@ def main(argv: list[str] | None = None) -> int:
         inputs.extend(
             path for path in farm.tables_dir.iterdir() if path.is_file()
         )
+    states_path = dataset.geoadmin_states_path(portfolio.base)
+    if states_path is not None:
+        inputs.append(states_path)
     outputs = [table_path, analysis_path]
     outputs.extend(out_dir / record["file"] for record in records)
 

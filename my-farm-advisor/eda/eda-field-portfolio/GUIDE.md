@@ -93,7 +93,7 @@ DATA_PIPELINE_DATA_ROOT="$DATA_PIPELINE_DATA_ROOT" \
 
 ```
 derived/eda/field-portfolio/
-  figures/                 b1_*.png b2_*.png b3_*.png m1_*.png
+  figures/                 m0_*.png m1_*.png b1_*.png b2_*.png b3_*.png
   tables/table_fields.csv  one row per field, stable column order
   analysis.json            the contract the report consumes
   manifest.json            inputs/outputs with sha256, validator status, git head
@@ -149,6 +149,16 @@ vertices co-vary at |ρ| = 0.64–0.95; compactness is exactly 1 / shape index²
 so ρ = −1.00 (boxed). Report area plus one shape metric — the rest are
 duplicates, and the near-1.0 cells are properties of the definitions, not of
 these fields.
+
+### M0 — `m0_portfolio_overview.png`
+
+All 30 fields in one EPSG:5070 Albers frame, with state outlines as context
+(optional: the panel degrades to fields plus graticule if the geoadmin layer
+is absent), a 2° graticule, a true-north arrow measured at the portfolio
+centre, and a CONUS locator inset. Tells how far apart the farms are and why
+one shared frame cannot replace M1. On the assignment-2 portfolio: clusters
+span 859 km east–west and 312 km north–south; the median field is 1.5 km
+across, 0.18% of the panel width, so field shape is unreadable at this scale.
 
 ### M1 — `m1_fields_by_grower.png`
 
