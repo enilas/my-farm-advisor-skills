@@ -168,7 +168,7 @@ def figure_area_distribution(pf: Portfolio, out_dir: Path) -> dict:
         ax,
         [
             f"Kruskal-Wallis  H={test.h:.2f}  {stats.format_p(test.p)}",
-            f"epsilon^2 = {test.epsilon_squared:.2f}   n = {test.n} fields",
+            f"ε² = {test.epsilon_squared:.2f}   n = {test.n} fields",
             f"median in-grower IQR {within:.0f} ha",
             f"grower-median gap    {between:.0f} ha",
             "smallest {} {:.0f} ha   largest {} {:.0f} ha".format(
