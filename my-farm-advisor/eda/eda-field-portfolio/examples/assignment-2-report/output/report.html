@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field portfolio report · My Farm Advisor</title>
+<style>
+:root {
+  --ink: #111827;
+  --muted: #4b5563;
+  --line: #e5e7eb;
+  --card: #f9fafb;
+  --accent: #0f766e;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--ink);
+  font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
+}
+.wrap { max-width: 1060px; margin: 0 auto; padding: 44px 24px 72px; }
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+}
+h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: -.01em; }
+.lede { margin: 0 0 18px; font-size: 17px; color: var(--muted); max-width: 62ch; }
+.howto {
+  margin: 22px 0 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 70ch;
+}
+.howto b { color: var(--ink); }
+.command {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 8px;
+}
+.fact {
+  flex: 1 1 130px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.fact b { display: block; font-size: 22px; line-height: 1.2; }
+.fact span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+nav.toc { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0 8px; font-size: 14px; }
+nav.toc a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+section { margin-top: 44px; }
+section > h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+section > .story { margin: 0 0 18px; color: var(--muted); max-width: 70ch; }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  margin-bottom: 22px;
+}
+.card img { display: block; width: 100%; height: auto; background: #fff; }
+.card .body { padding: 16px 18px 18px; }
+.card h3 { margin: 0 0 2px; font-size: 19px; line-height: 1.3; }
+.question { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-style: italic; }
+.finding { margin: 0 0 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
+.chips li {
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: #374151;
+}
+.caveat {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.caveat b { color: var(--ink); font-weight: 600; }
+.methods { margin-top: 48px; border-top: 2px solid var(--ink); padding-top: 20px; }
+.methods h2 { margin: 0 0 10px; font-size: 18px; }
+.methods dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; font-size: 14px; }
+.methods dt { font-weight: 600; }
+.methods dd { margin: 0; color: var(--muted); }
+footer { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 16px; font-size: 13px; color: var(--muted); }
+footer code { color: var(--ink); }
+.hashes { width: 100%; border-collapse: collapse; margin: 12px 0 16px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.hashes th, .hashes td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.hashes th { color: var(--muted); font-weight: 600; }
+.note { margin: 10px 0 0; }
+@media (max-width: 720px) {
+  h1 { font-size: 27px; }
+}
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body { font-size: 11pt; }
+  .wrap { max-width: none; padding: 0; }
+  nav.toc { display: none; }
+  section { break-before: page; margin-top: 0; }
+  .card { break-inside: avoid; margin-bottom: 16px; }
+  .card img { max-height: 175mm; object-fit: contain; }
+  a { color: inherit; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="eyebrow">My Farm Advisor · eda-field-portfolio</p>
+  <h1>Field portfolio report</h1>
+  <p class="lede">30 fields across 3 growers, compared on boundaries, crop history, and weather.</p>
+  <code class="command">./scripts/run-eda-field-portfolio.sh --stage all</code>
+</header>
+
+<div class="facts"><div class="fact"><b>30</b><span>fields</span></div><div class="fact"><b>3</b><span>growers</span></div><div class="fact"><b>10</b><span>weather cells</span></div><div class="fact"><b>CDL 2019–2023</b><span>crop-history window</span></div></div>
+
+<nav class="toc"><a href="#boundaries">boundaries</a><a href="#crop-history">crop history</a><a href="#weather">weather</a></nav>
+
+<p class="howto"><b>Reading this report.</b> Each card answers one question and
+carries the finding, the test and effect size, the sample size, and the caveat
+that limits it — read the caveat before quoting a number. Nothing here is
+recomputed: every value is copied from the <code>analysis.json</code> the run
+already wrote. Print the page to PDF from a browser for a paginated copy.</p>
+
+
+<section id="boundaries">
+  <h2>boundaries · 5 figures</h2>
+  <p class="story">Field size and shape from the ingested boundaries. The unit is the field; there is no time dimension here.</p>
+  
+<figure class="card">
+  <img src="figures/m0_portfolio_overview.png" alt="One frame, 30 fields across 859 km" loading="lazy">
+  <div class="body">
+    <h3>One frame, 30 fields across 859 km</h3>
+    <p class="question">Where does the whole portfolio sit, and how far apart are the farms?</p>
+    <p class="finding">All 30 fields fall into 3 clusters spanning 859 km east-west and 312 km north-south. A median field is 1.5 km across, 0.2% of the panel width, so the shared frame is a location view, not a shape view.</p>
+    <ul class="chips"><li>Descriptive</li><li>span 859 × 312 km</li><li>median field 1.5 km</li><li>EPSG:5070</li></ul>
+    <p class="caveat"><b>Caveat.</b> The shared frame compresses each farm to a dot: distance between clusters is honest, field shape and layout are not. Read shape in M1. A single true-north arrow is drawn at the portfolio centre; grid convergence shifts north by a few degrees across the panel.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/b1_area_distribution.png" alt="Grower medians differ, but ranges overlap" loading="lazy">
+  <div class="body">
+    <h3>Grower medians differ, but ranges overlap</h3>
+    <p class="question">Are the three growers&#x27; fields distinguishable by size alone?</p>
+    <p class="finding">Areas span 184-387 ha. The typical in-grower IQR is 30 ha against a 37 ha span between grower medians, so grower medians differ by more than the typical in-grower spread. The groups separate as samples, not as individuals: size alone does not say which grower a field belongs to.</p>
+    <ul class="chips"><li>Kruskal–Wallis</li><li>H = 18.6</li><li>ε² = 0.61</li><li>p &lt; 0.001</li></ul>
+    <p class="caveat"><b>Caveat.</b> n=30 fields across three farms (10 each). The test describes field-to-field variation, not a designed experiment; the grower comparison is 10 vs 10 vs 10.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/b2_area_vs_shape.png" alt="Field size does not predict shape" loading="lazy">
+  <div class="body">
+    <h3>Field size does not predict shape</h3>
+    <p class="question">Does field size predict boundary complexity?</p>
+    <p class="finding">Pooled Spearman rho = +0.35 (95% CI -0.07 to +0.68) over 30 fields: no evidence of a monotone size-shape trend (the 95% CI includes zero).</p>
+    <ul class="chips"><li>Spearman ρ</li><li>ρ = +0.35</li><li>95% CI -0.07 to +0.68</li><li>p = 0.058</li></ul>
+    <p class="caveat"><b>Caveat.</b> Rank correlation over 30 fields resolves only strong monotone trends; a value near zero means no monotone relation, not proof of independence for every possible shape.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/b3_geometry_correlation.png" alt="Boundary metrics collapse to size and shape" loading="lazy">
+  <div class="body">
+    <h3>Boundary metrics collapse to size and shape</h3>
+    <p class="question">Which boundary metrics carry distinct information?</p>
+    <p class="finding">Area is the only independent size metric (rho with perimeter +0.57). Perimeter, shape index and vertices co-vary at |rho| = 0.64 to 0.95; compactness is shape index inverted (rho = -1.00). Quote area plus one shape metric; the rest are duplicates.</p>
+    <ul class="chips"><li>Spearman matrix</li><li>area↔perimeter ρ = +0.57</li><li>shape↔compactness ρ = -1.00</li></ul>
+    <p class="caveat"><b>Caveat.</b> The near-1.0 entries are properties of the metric definitions, not of these particular fields; they would hold for any boundary set.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/m1_fields_by_grower.png" alt="Thirty fields, three layouts" loading="lazy">
+  <div class="body">
+    <h3>Thirty fields, three layouts</h3>
+    <p class="question">Where are the fields, and how does each grower&#x27;s layout differ?</p>
+    <p class="finding">30 fields across 3 growers, 17,909 acres. Panels are independent field-local frames; the 10 weather cells behind them are fewer than the 30 fields, so field-level weather is not independent.</p>
+    <ul class="chips"><li>Descriptive</li></ul>
+    <p class="caveat"><b>Caveat.</b> Each panel has its own tilt, so compare layout and shape, not absolute orientation. Fill is a continuous area ramp, not a class. Only the smallest and largest field per panel are labelled; the rest are identified in tables/table_fields.csv.</p>
+  </div>
+</figure>
+</section>
+<section id="crop-history">
+  <h2>crop history · 3 figures</h2>
+  <p class="story">What each field actually grew, using the dominant CDL class per field-year. Consecutive years are a sequence, not independent samples.</p>
+  
+<figure class="card">
+  <img src="figures/c1_crop_mix_by_year.png" alt="Corn and soy split the portfolio; Nebraska leans corn" loading="lazy">
+  <div class="body">
+    <h3>Corn and soy split the portfolio; Nebraska leans corn</h3>
+    <p class="question">How is the planted crop mix distributed across growers and years?</p>
+    <p class="finding">Corn covers 86 of 150 field-years (57%). IL 29/50; IA 24/50; NE 33/50. Soybeans are the counterweight everywhere except Nebraska, and no year departs from the same two-crop split.</p>
+    <ul class="chips"><li>Composition</li><li>corn share 57%</li></ul>
+    <p class="caveat"><b>Caveat.</b> Field-years are not independent: the same 10 fields appear in all five years, so the bar is a composition, not a trend. The dominant class is used; minority edge classes (grass, forest, wheat) never win.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/c2_crop_sequence.png" alt="Almost every field rotates; four stay in corn" loading="lazy">
+  <div class="body">
+    <h3>Almost every field rotates; four stay in corn</h3>
+    <p class="question">What crop sequence did each field actually follow from 2019 to 2023?</p>
+    <p class="finding">26 of 30 fields change crop at least once; 4 stay in continuous corn and none stay in soybeans. 5 distinct 5-year sequences appear. The repeating Corn–Soybeans beat is the norm, with corn–corn runs concentrated in Nebraska.</p>
+    <ul class="chips"><li>Sequence</li><li>26 rotating / 4 continuous</li></ul>
+    <p class="caveat"><b>Caveat.</b> Five years and thirty fields: the grid shows what happened, not what is agronomically intended. A one-year switch back to the same crop still counts as rotation here; read the rows, not a summary label.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/c3_crop_transitions.png" alt="Soybeans never follow soybeans" loading="lazy">
+  <div class="body">
+    <h3>Soybeans never follow soybeans</h3>
+    <p class="question">Does the next crop depend on the current crop, and does every grower rotate alike?</p>
+    <p class="finding">82.5% of 120 year-to-year transitions change crop (99 of 120). Soybeans are followed by corn in 100% of cases, while corn is followed by corn 30% of the time. Switch rates run IL 90% (36/40), IA 98% (39/40), NE 60% (24/40); same-crop transitions are IL 4, IA 1, NE 16 (all corn), concentrated in Nebraska.</p>
+    <ul class="chips"><li>χ² independence</li><li>χ² = 59.2</li><li>df = 1</li><li>V = 0.70</li><li>p &lt; 0.001</li></ul>
+    <p class="caveat"><b>Caveat.</b> The 120 transitions overlap: four consecutive pairs share each field, so the chi-square p-value is anti-conservative. The zero soybean→soybean cell and the grower split are the robust facts; treat the p as a description of this window, not a population test.</p>
+  </div>
+</figure>
+</section>
+<section id="weather">
+  <h2>weather · 3 figures</h2>
+  <p class="story">Seasonal heat, frost, and rain on the NASA POWER cell, rolled to cell-year. Thirty fields are not thirty climates.</p>
+  
+<figure class="card">
+  <img src="figures/w1_gdd_by_site_year.png" alt="Latitude sets the heat budget; the year shifts it" loading="lazy">
+  <div class="body">
+    <h3>Latitude sets the heat budget; the year shifts it</h3>
+    <p class="question">How much seasonal heat does each site get, and is the difference a grower or a year effect?</p>
+    <p class="finding">Median season GDD is IL 1796, IA 1666, NE 1957. The groups separate overall (H = 40.2, p &lt; 0.001, ε² = 0.81). The year-to-year spread inside a cell (median 146, max 202 GDD) is wider than the 130 GDD gap between the closest group medians, so the cooler groups overlap even though the hottest one stands apart. Latitude sets the level; the year decides where a site lands within it.</p>
+    <ul class="chips"><li>Kruskal–Wallis</li><li>H = 40.2</li><li>ε² = 0.81</li><li>p &lt; 0.001</li><li>10 cells</li></ul>
+    <p class="caveat"><b>Caveat.</b> The five years behind a cell are repeated measures, so the site-year p-value is optimistic; the cell-mean test uses 10 units and is the conservative check. GDD is a heat sum, not a yield predictor, and the cap convention is stated in the guide.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/w2_frost_window.png" alt="Frost-free windows run 164–213 days" loading="lazy">
+  <div class="body">
+    <h3>Frost-free windows run 164–213 days</h3>
+    <p class="question">When does the growing season start and end, and how much does the window vary?</p>
+    <p class="finding">Across 50 site-years the frost-free window runs 164–213 days (median 187). IL median 193 days (174–210); IA median 181 days (164–202); NE median 193 days (181–213). Spring frosts cluster in the third week of April and fall frosts in late October to early November. The longest and shortest medians differ by 12 days, so the contrast is a shift of weeks, not a different season type.</p>
+    <ul class="chips"><li>Frost window</li><li>median 187 d</li><li>range 164–213 d</li><li>10 cells</li></ul>
+    <p class="caveat"><b>Caveat.</b> A frost is Tmin &lt; 0 °C inside the spring (Mar–Jun) or fall (Aug–Nov) window; a January thaw is not a season start. The window says when freezing stopped and resumed, not whether a crop was in the ground.</p>
+  </div>
+</figure>
+<figure class="card">
+  <img src="figures/w3_precip_vs_gdd.png" alt="Hotter sites are also drier" loading="lazy">
+  <div class="body">
+    <h3>Hotter sites are also drier</h3>
+    <p class="question">Do the hotter sites also get less seasonal rain?</p>
+    <p class="finding">Seasonal precipitation and GDD are negatively rank-correlated (rho = -0.52, 95% CI -0.73 to -0.24, p &lt; 0.001) over 50 site-years. The sign holds within each year (5 of 5), so the west-to-east moisture gradient is not an artefact of pooling five different years.</p>
+    <ul class="chips"><li>Spearman ρ</li><li>ρ = -0.52</li><li>95% CI -0.73 to -0.24</li><li>p &lt; 0.001</li><li>negative in 5/5 years</li><li>10 cells</li></ul>
+    <p class="caveat"><b>Caveat.</b> Ten cells supply the spatial contrast and five years the temporal one; the pooled rank test mixes both, so the per-year signs are the check. Rank correlation says the wetter sites are cooler, not that rain causes cooler conditions.</p>
+  </div>
+</figure>
+</section>
+
+<section class="methods" id="methods">
+  <h2>Conventions and units</h2>
+  <dl>
+    <dt>boundaries</dt><dd>field (n per grower)</dd><dt>cdl</dt><dd>field-year (dominant CDL class; 5 years per field)</dd><dt>weather</dt><dd>NASA POWER cell / site-year; fields are not independent samples</dd>
+    <dt>GDD</dt><dd>Seasonal sum, base 10 °C, daily maximum capped at 30 °C, April–September.</dd>
+    <dt>Frost</dt><dd>Tmin below 0 °C; last spring frost searched from March, first fall frost from August.</dd>
+    <dt>Precipitation</dt><dd>April–September total, millimetres.</dd>
+    <dt>Crop class</dt><dd>Dominant CDL class per field-year; minority edge classes never win.</dd>
+  </dl>
+</section>
+
+<footer>
+  <p>Dataset validator: passed — 0 failure(s), 0 warning(s) across 3 farm(s). 11 figure records, 3 categories.
+  Units and effect sizes are copied from <code>analysis.json</code>; this page does not
+  recompute them.</p>
+  
+  <p>Reproduce: <code>./scripts/run-eda-field-portfolio.sh</code> from
+  <code>data-pipeline/</code>. Outputs live under
+  <code>&lt;runtime&gt;/derived/eda/field-portfolio/</code>
+  (<code>figures/</code>, <code>tables/table_fields.csv</code>,
+  <code>analysis.json</code>, <code>manifest.json</code>). Print this page to PDF
+  from a browser if a paginated copy is needed.</p>
+  <table class="hashes"><thead><tr><th>figure</th><th>file</th><th>sha256</th></tr></thead><tbody><tr><td>m0_portfolio_overview</td><td>figures/m0_portfolio_overview.png</td><td>00cf2e59904b</td></tr><tr><td>b1_area_distribution</td><td>figures/b1_area_distribution.png</td><td>5f2d8f0a7915</td></tr><tr><td>b2_area_vs_shape</td><td>figures/b2_area_vs_shape.png</td><td>0ce85f1ef9ac</td></tr><tr><td>b3_geometry_correlation</td><td>figures/b3_geometry_correlation.png</td><td>cd0f71815eb4</td></tr><tr><td>m1_fields_by_grower</td><td>figures/m1_fields_by_grower.png</td><td>27add186246e</td></tr><tr><td>c1_crop_mix_by_year</td><td>figures/c1_crop_mix_by_year.png</td><td>6fbf79fcd2d3</td></tr><tr><td>c2_crop_sequence</td><td>figures/c2_crop_sequence.png</td><td>4b11047ace7a</td></tr><tr><td>c3_crop_transitions</td><td>figures/c3_crop_transitions.png</td><td>ab4fb40fc3eb</td></tr><tr><td>w1_gdd_by_site_year</td><td>figures/w1_gdd_by_site_year.png</td><td>e2301e9b20f8</td></tr><tr><td>w2_frost_window</td><td>figures/w2_frost_window.png</td><td>8597e590f0c4</td></tr><tr><td>w3_precip_vs_gdd</td><td>figures/w3_precip_vs_gdd.png</td><td>aa3508b6cb84</td></tr></tbody></table>
+</footer>
+</div>
+</body>
+</html>

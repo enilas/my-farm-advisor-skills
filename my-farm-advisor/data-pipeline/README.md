@@ -16,6 +16,9 @@ The best-available-data ladder and the keyless RDM regional-reference API
   viewport rotation — [references/field-map-frame.md](references/field-map-frame.md).
 - Every map renders over keyless **Esri World Imagery** warped into the same rotated frame —
   [references/basemap.md](references/basemap.md).
+- Grower-level interactive web map (all fields of a grower, online satellite
+  basemap, clickable metadata, zoom-to-field list):
+  [grower-web-map/README.md](grower-web-map/README.md).
 ## Example renders
 
 Vision-QC'd sample figures ship under [`examples/`](examples/) — one
@@ -251,6 +254,39 @@ export DATA_PIPELINE_DATA_ROOT=/absolute/path/to/my-farm-advisor-runtime
 ```
 
 The `environment.d` file applies to future sessions only. It does not update an already-running shell.
+
+## Metadata normalization and dataset validation
+
+Canonical metadata is derived from the farm boundary geometry, never from a
+hardcoded literal: `farm.json.state`, `state_fips`, and `counties` follow the
+per-field properties written by the ingest legs, and `field.json.field_id`
+uses the same lowercase-hyphen slug as boundaries, weather, CDL, inventory,
+and the field directory. Ingest reruns merge into existing metadata, so
+operator-set display names and extra keys survive.
+
+Repair an existing tree (idempotent; dry run first):
+
+```bash
+cd "${DATA_PIPELINE_DATA_ROOT}/data-pipeline/src"
+"${DATA_PIPELINE_DATA_ROOT}/data-pipeline/.venv/bin/python" \
+  scripts/maintenance/normalize_dataset_metadata.py
+"${DATA_PIPELINE_DATA_ROOT}/data-pipeline/.venv/bin/python" \
+  scripts/maintenance/normalize_dataset_metadata.py --apply
+```
+
+Gate a dataset before analysis or hand-off:
+
+```bash
+"${DATA_PIPELINE_DATA_ROOT}/data-pipeline/.venv/bin/python" \
+  scripts/validate_dataset.py            # exit 1 on any FAIL
+"${DATA_PIPELINE_DATA_ROOT}/data-pipeline/.venv/bin/python" \
+  scripts/validate_dataset.py --layers boundaries,weather,cdl
+```
+
+The validator cross-checks metadata against boundaries, ID sets across
+inventory/directories/weather/CDL, weather day coverage and nulls, CDL year
+completeness and `pct` sanity, and artifact staleness (for example farm-level
+tables or reports left over from an earlier, smaller field set).
 
 ## Running inside an agent CLI
 

@@ -281,6 +281,19 @@ The umbrella entrypoint is [`SKILL.md`](SKILL.md). From there, the skill routes 
 | Strategy         | Crop strategy and maturity planning workflows                          | [`strategy/INDEX.md`](strategy/INDEX.md)                 |
 | Weather          | NASA POWER weather ingestion and downstream weather analysis           | [`weather/INDEX.md`](weather/INDEX.md)                   |
 
+### Custom EDA skill: `eda-field-portfolio`
+
+[`eda/eda-field-portfolio/`](eda/eda-field-portfolio/GUIDE.md) is a custom,
+runnable EDA skill (not a recipe to copy). It compares a set of growers across
+three fixed categories — field boundaries, crop history from CDL, and weather —
+and writes 11 static PNGs (B1–B3, C1–C3, W1–W3, plus the M0/M1 maps),
+`tables/table_fields.csv`, the report contract `analysis.json`, and a rendered
+single-page `report.html` under `<runtime>/derived/eda/field-portfolio/`.
+`manifest.json` hashes every input and output. The HTML report is a renderer of
+`analysis.json` — it copies the numbers and recomputes nothing — and prints to
+PDF from a browser. A committed copy lives at
+[`eda/eda-field-portfolio/examples/assignment-2-report/output/report.html`](eda/eda-field-portfolio/examples/assignment-2-report/output/report.html).
+
 ## Typical Workflow
 
 ```mermaid
